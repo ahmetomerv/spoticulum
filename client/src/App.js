@@ -58,7 +58,7 @@ class App extends React.Component {
     const hashParams = {};
     let e,
         r = /([^&;=]+)=?([^&;]*)/g,
-        q = window.location.pathname.substring(1);
+        q = window.location.search.substring(1);
 
     while (e = r.exec(q)) {
       hashParams[e[1]] = decodeURIComponent(e[2]);
