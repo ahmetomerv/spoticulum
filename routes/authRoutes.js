@@ -45,7 +45,7 @@ router.get('/logged', async (req, res) => {
    .then(data => {
       const query = querystring.stringify(data);
       console.log(query);
-      res.redirect(`https://spoticulum.xyz/?${query}`);
+      res.redirect(`www.spoticulum.xyz/?${query}`);
    });
 });
 
