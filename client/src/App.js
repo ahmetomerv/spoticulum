@@ -150,7 +150,7 @@ class App extends React.Component {
                   <h2>Spoticulum</h2>
                 </div>
                 <p className="login-info">Login with Spotify to generate your profile graph based on what you listen to the most. <br/>Authentication is safe and handled by Spotify.</p>
-                <a className="button primary-button" href="www.spoticulum.xyz/api/login">Login with Spotify</a>
+                <a className="button primary-button" href="http://www.spoticulum.xyz/api/login">Login with Spotify</a>
                 {/*<a className="button primary-button" style={{ marginLeft: '1em' }} onClick={this.handleGenerateClick} >Generate</a>*/}
               </div>
           }
