@@ -1,0 +1,22 @@
+{
+  "name": "spoticulum-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "application.js",
+  "scripts": {
+    "start": "node application.js",
+    "install-client": "cd client && npm install",
+    "build-client": "cd client && npm run build",
+    "heroku-postbuild": "npm run install-client && npm run build-client",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ahmet Ömer",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "node-fetch": "^2.6.0",
+    "querystring": "^0.2.0"
+  }
+}

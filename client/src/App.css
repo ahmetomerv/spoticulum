@@ -1,0 +1,54 @@
+body {
+  padding: 1em;
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  height: 100vh;
+  align-items: center;
+}
+
+.login-container {
+  text-align: center;
+}
+
+.login-container .login-info {
+  margin-bottom: 1em;
+}
+
+.button {
+  display: inline-block;
+  padding: .6em 2em;
+  text-decoration: none;
+  border-radius: 3px;
+  color: #000;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.button:active {
+  transition: position .5s ease-in;
+  border: 3px solid #2d614934 !important;
+}
+
+.primary-button:hover {
+  background: #53ce94;
+  border: 3px solid #2d61491a;
+  color: #000;
+}
+
+.primary-button {
+  background: #58dea0;
+  color: #000;
+  border: 3px solid #2d614900;
+}
+
+.loading-button {
+  padding: 1.025em 2em;
+}
+
+.canvas-container .canvas-actions-container {
+  margin-top: 2em;
+  text-align: center;
+}
