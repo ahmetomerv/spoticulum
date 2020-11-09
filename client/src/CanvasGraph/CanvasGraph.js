@@ -16,16 +16,12 @@ class CanvasGraph extends React.Component {
 	}
 
 	componentDidMount() {
-		console.log('Canvas graph component mounted.');
-		console.log(this.state.artists);
-		console.log(this.state.user);
 		if (this.state.artists && this.state.artists.length && this.state.user) {
 			this.createSpotifyGraph();
 		}
 	}
 
 	imgLoadCallback = (status) => {
-		console.log(status);
 		this.setState({
 			imgResults: [...this.state.imgResults, status],
 		}, () => {
@@ -104,9 +100,8 @@ class CanvasGraph extends React.Component {
   
     let rowsCount = 4;
     let cellIndexCounter = 0;
-
-    const profileUrl = 'https://pbs.twimg.com/profile_images/1318900419519782912/cuawUbZM_400x400.jpg';
-    //const profileUrl = this.state.user.images[0].url;
+    
+    const profileUrl = this.state.user.images[0].url;
     drawCell(2, 2, bgColor, context, p, profileUrl, profileCellSize, this.imgLoadCallback);
     
     for (let z = 0; z < rowsCount; z++) {
