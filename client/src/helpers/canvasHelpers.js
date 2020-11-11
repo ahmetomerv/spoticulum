@@ -113,7 +113,6 @@ export const drawCell = (xCell, yCell, color, context, p, imgUrl, cellSize, imgR
 
 				}, 50);
 			})();
-
 		}
 	};
 	
