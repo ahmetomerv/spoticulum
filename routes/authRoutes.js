@@ -5,15 +5,14 @@ const encodeFormData = require('../helperFunctions/encodeFormData.js');
 const querystring = require('querystring');
 
 router.get('/login', async (req, res) => {
-	const scope = `
-		user-modify-playback-state
-		user-read-playback-state
-		user-read-currently-playing
-		user-library-modify
-		user-library-read
-		user-top-read
-		playlist-read-private
-		playlist-modify-public`;
+	const scope = `user-modify-playback-state
+	 user-read-playback-state
+	 user-read-currently-playing
+	 user-library-modify
+	 user-library-read
+	 user-top-read
+	 playlist-read-private
+	 playlist-modify-public`;
 
 	res.redirect('https://accounts.spotify.com/authorize?' +
 		querystring.stringify({

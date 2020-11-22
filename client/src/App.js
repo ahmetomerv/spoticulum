@@ -67,9 +67,6 @@ class App extends React.Component {
 	}
 
 	getTop = (accessToken, requestedType, nextUrl, callback) => {
-		console.log(accessToken);
-		console.log(requestedType);
-		console.log(nextUrl);
 		this.setState({ isLoading: true });
 
 		let url;
