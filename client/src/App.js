@@ -1,6 +1,6 @@
 import './App.css';
 import React from 'react';
-import { Form } from 'semantic-ui-react';
+import { Form, Image } from 'semantic-ui-react';
 import Spinner from './Spinner';
 import CanvasGraph from './CanvasGraph/CanvasGraph';
 import mediaEntityMapper from './helpers/mediaEntityMapper';
@@ -134,7 +134,19 @@ class App extends React.Component {
 
 								{ this.state.user
 									? <Form className="request-type-form">
-											<Form.Field>Generate based on:</Form.Field>
+											<Form.Field>
+												<label>
+													Logged in as
+												</label>
+												<Image src={this.state.user.images.length ? this.state.user.images[0].url : 'default-profile-icon-16.jpg'} bordered avatar />
+												<span>{ this.state.user.display_name }</span>
+											</Form.Field>
+											<br/>
+											<Form.Field>
+												<label>
+													Generate based on:
+												</label>
+											</Form.Field>
 											<Form.Group className="request-type-form-group">
 												<Form.Radio
 													label='Artists'
