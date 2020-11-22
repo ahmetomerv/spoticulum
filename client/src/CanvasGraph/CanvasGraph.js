@@ -6,8 +6,7 @@ import { createHiDPICanvas, initializeCanvasGradient, drawCell, downloadCanvasIm
 class CanvasGraph extends React.Component {
 
 	state = {
-		artists: this.props.artists,
-		tracks: [],
+		mediaEntities: this.props.mediaEntities,
 		user: this.props.user,
 		isLoading: true,
 		graphIsReady: false,
@@ -16,7 +15,7 @@ class CanvasGraph extends React.Component {
 	}
 
 	componentDidMount() {
-		if (this.state.artists && this.state.artists.length && this.state.user) {
+		if (this.state.mediaEntities && this.state.mediaEntities.length && this.state.user) {
 			this.createSpotifyGraph();
 		}
 	}
@@ -106,9 +105,9 @@ class CanvasGraph extends React.Component {
 		for (let z = 0; z < rowsCount; z++) {
 			for (let i = 0; i < stepsToTake; i++) {
 				if (stepsToTakeRight !== 0) {
-					let imgUrl = this.state.artists[cellIndexCounter] && this.state.artists[cellIndexCounter].images.length
-						? this.state.artists[cellIndexCounter].images[0].url
-						: this.getRandomArtistImgUrl(this.state.artists);
+					let imgUrl = this.state.mediaEntities[cellIndexCounter] && this.state.mediaEntities[cellIndexCounter].images.length
+						? this.state.mediaEntities[cellIndexCounter].images[0].url
+						: this.getRandomMediaEntityImgUrl(this.state.mediaEntities);
 
 					drawCell(startingXCell + i, startingYCell, bgColor, context, p, imgUrl, cellSize, this.imgLoadCallback);
 					cellIndexCounter++;
@@ -121,9 +120,9 @@ class CanvasGraph extends React.Component {
 				}
 
 				if (stepsToTakeBottom !== 0 && stepsToTakeRight === 0) {
-					let imgUrl = this.state.artists[cellIndexCounter] && this.state.artists[cellIndexCounter].images.length
-						? this.state.artists[cellIndexCounter].images[0].url
-						: this.getRandomArtistImgUrl(this.state.artists);
+					let imgUrl = this.state.mediaEntities[cellIndexCounter] && this.state.mediaEntities[cellIndexCounter].images.length
+						? this.state.mediaEntities[cellIndexCounter].images[0].url
+						: this.getRandomMediaEntityImgUrl(this.state.mediaEntities);
 
 					drawCell(rightStepLastCell.x, startingYCell + stepCounter, bgColor, context, p, imgUrl, cellSize, this.imgLoadCallback);
 					cellIndexCounter++;
@@ -138,9 +137,9 @@ class CanvasGraph extends React.Component {
 				}
 
 				if (stepsToTakeLeft !== 0 && stepsToTakeBottom === 0) {
-					let imgUrl = this.state.artists[cellIndexCounter] && this.state.artists[cellIndexCounter].images.length
-						? this.state.artists[cellIndexCounter].images[0].url
-						: this.getRandomArtistImgUrl(this.state.artists);
+					let imgUrl = this.state.mediaEntities[cellIndexCounter] && this.state.mediaEntities[cellIndexCounter].images.length
+						? this.state.mediaEntities[cellIndexCounter].images[0].url
+						: this.getRandomMediaEntityImgUrl(this.state.mediaEntities);
 
 					drawCell(bottomStepLastCell.x + stepCounter, bottomStepLastCell.y, bgColor, context, p, imgUrl, cellSize, this.imgLoadCallback);
 					cellIndexCounter++;
@@ -155,9 +154,9 @@ class CanvasGraph extends React.Component {
 				}
 
 				if (stepsToTakeTop !== 0 && stepsToTakeLeft === 0) {
-					let imgUrl = this.state.artists[cellIndexCounter] && this.state.artists[cellIndexCounter].images.length
-						? this.state.artists[cellIndexCounter].images[0].url
-						: this.getRandomArtistImgUrl(this.state.artists);
+					let imgUrl = this.state.mediaEntities[cellIndexCounter] && this.state.mediaEntities[cellIndexCounter].images.length
+						? this.state.mediaEntities[cellIndexCounter].images[0].url
+						: this.getRandomMediaEntityImgUrl(this.state.mediaEntities);
 
 					drawCell(leftStepLastCell.x, leftStepLastCell.y - stepCounter, bgColor, context, p, imgUrl, cellSize, this.imgLoadCallback);
 					cellIndexCounter++;
@@ -210,21 +209,21 @@ class CanvasGraph extends React.Component {
     
 	}
 	
-	getRandomArtistImgUrl = (artists) => {
-		if (artists) {
-			const randomNum = (Math.floor(Math.random() * artists.length - 1));
+	getRandomMediaEntityImgUrl = (mediaEntities) => {
+		if (mediaEntities) {
+			const randomNum = (Math.floor(Math.random() * mediaEntities.length - 1));
 			let imgUrl;
-			if (artists[randomNum] && artists[randomNum].images.length && artists[randomNum].images[0]) {
-				imgUrl = artists[randomNum].images[0].url;
+			if (mediaEntities[randomNum] && mediaEntities[randomNum].images.length && mediaEntities[randomNum].images[0]) {
+				imgUrl = mediaEntities[randomNum].images[0].url;
 			} else {
-				imgUrl = this.getRandomArtistImgUrl(artists);
+				imgUrl = this.getRandomMediaEntityImgUrl(mediaEntities);
 			}
 
 			return imgUrl;
 		}
 
 		return '';
-  }
+   }
 
 	render() {
 		return (

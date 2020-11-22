@@ -1,7 +1,10 @@
 import './App.css';
 import React from 'react';
+import { Form } from 'semantic-ui-react';
 import Spinner from './Spinner';
 import CanvasGraph from './CanvasGraph/CanvasGraph';
+import mediaEntityMapper from './helpers/mediaEntityMapper';
+import { updateDocumentTitle, getHashParams } from './helpers/utils';
 
 class App extends React.Component {
 
@@ -12,10 +15,9 @@ class App extends React.Component {
 		expiresIn: null,
 		scope: '',
 		error: null,
-		requestedType: 'artists',
+		requestedType: '',
 		timeRange: 'medium_term',
-		artists: [],
-		tracks: [],
+		mediaEntities: [],
 		user: null,
 		nextUrl: '',
 		isLoading: false,
@@ -23,7 +25,7 @@ class App extends React.Component {
 	}
 
 	componentDidMount() {
-		const params = this.getHashParams();
+		const params = getHashParams();
 
 		if (params) {
 			this.setState({
@@ -33,46 +35,14 @@ class App extends React.Component {
 				scope: params.scope,
 				tokenType: params.token_type,
 			}, () => {
-				const { requestedType } = this.state;
-				const getTopCallback = () => {
-					if (this.state.nextUrl) {
-						this.getTop(params.access_token, requestedType, this.state.nextUrl, getTopCallback);
-					} else {
-						this.setState({ canGenerateGraph: true });
-					}
-				}
-
 				if (params.access_token) {
-					this.getAuthenticatedUser(params.access_token, () => {
-						this.getTop(params.access_token, requestedType, null, () => {
-							this.getTop(params.access_token, requestedType, this.state.nextUrl, getTopCallback);
-						});
-					});
+					this.getAuthenticatedUser(params.access_token);
 				}
 			});
 		}
-	}
-
-	getHashParams = () => {
-		const hashParams = {};
-		let e,
-			r = /([^&;=]+)=?([^&;]*)/g,
-			q = window.location.search.substring(1);
-
-		while (e = r.exec(q)) {
-			hashParams[e[1]] = decodeURIComponent(e[2]);
-		}
-
-		return hashParams;
-	}
-
-	updateDocumentTitle = (title) => {
-		if (title) {
-			document.title = 'Spoticulum of ' + title;
-		}
-	}
+	}	
   
-	getAuthenticatedUser = (accessToken, callback) => {
+	getAuthenticatedUser = (accessToken) => {
 		this.setState({ isLoading: true });
 		const url = 'https://api.spotify.com/v1/me';
 		const headers = {
@@ -84,7 +54,7 @@ class App extends React.Component {
 			.then(data => {
 				this.setState({ user: data });
 				if (data && data.display_name) {
-					this.updateDocumentTitle(data.display_name);
+					updateDocumentTitle(data.display_name);
 				}
 			})
 			.catch(error => {
@@ -93,17 +63,17 @@ class App extends React.Component {
 			})
 			.finally(() => {
 				this.setState({ isLoading: false });
-				callback();
 			});
 	}
 
 	getTop = (accessToken, requestedType, nextUrl, callback) => {
+		console.log(accessToken);
+		console.log(requestedType);
+		console.log(nextUrl);
 		this.setState({ isLoading: true });
 
 		let url;
-		let params = new URLSearchParams({
-			time_range: this.state.timeRange,
-		});
+		let params = new URLSearchParams({ time_range: this.state.timeRange });
 		const headers = {
 			Authorization: 'Bearer ' + accessToken
 		};
@@ -116,10 +86,11 @@ class App extends React.Component {
 
 		fetch(url , { headers })
 			.then(response => response.json())
-			.then(data => {
+			.then(res => {
+				const data = res.items.map(mediaEntityMapper);
 				this.setState({
-					[requestedType]: [...this.state[requestedType], ...data.items],
-					nextUrl: data.next,
+					mediaEntities: [...this.state.mediaEntities, ...data],
+					nextUrl: res.next,
 				});
 			})
 			.catch(error => {
@@ -132,6 +103,23 @@ class App extends React.Component {
 			});
 	}
 
+	handleTypeChange = (e, { value }) => {
+		this.setState({ requestedType: value }, () => {
+			const { requestedType, accessToken } = this.state;
+			const getTopCallback = () => {
+				if (this.state.nextUrl) {
+					this.getTop(accessToken, requestedType, this.state.nextUrl, getTopCallback);
+				} else {
+					this.setState({ canGenerateGraph: true });
+				}
+			}
+	
+			this.getTop(accessToken, requestedType, null, () => {
+				this.getTop(accessToken, requestedType, this.state.nextUrl, getTopCallback);
+			});
+		});
+	}
+
 	render() {
 		
 		return (
@@ -140,14 +128,37 @@ class App extends React.Component {
 
 				<div className="container">
 					{ this.state.canGenerateGraph
-						? <CanvasGraph artists={this.state.artists} user={this.state.user}/>
+						? <CanvasGraph mediaEntities={this.state.mediaEntities} user={this.state.user}/>
 						: <div className="login-container">
 								<div style={{ marginBottom: '5em' }}>
 									<img className="spotify-logo" width="100" src="spotify-logo.png" alt="Spoticulum logo"/>
 									<h2>Spoticulum</h2>
 								</div>
-								<p className="login-info">Login with Spotify to generate your profile graph based on what you listen to the most. <br/>Authentication is safe and handled by Spotify.</p>
-								<a className="button primary-button" href="http://www.spoticulum.xyz/api/login">Login with Spotify</a>
+
+								{ this.state.user
+									? <Form className="request-type-form">
+											<Form.Field>Generate based on:</Form.Field>
+											<Form.Group className="request-type-form-group">
+												<Form.Radio
+													label='Artists'
+													value='artists'
+													checked={this.state.requestedType === 'artists'}
+													onChange={this.handleTypeChange}
+												/>
+												<Form.Radio
+													label='Albums'
+													value='tracks'
+													checked={this.state.requestedType === 'tracks'}
+													onChange={this.handleTypeChange}
+												/>
+											</Form.Group>
+										</Form>
+									: <React.Fragment>
+											<p className="login-info">Login with Spotify to generate your profile graph based on what you listen to the most.<br/>Authentication is safe and handled by Spotify.</p>
+											<a className="button primary-button" href="http://www.spoticulum.xyz/api/login">Login with Spotify</a>
+										</React.Fragment>
+								}
+
 							</div>
 					}
 				</div>

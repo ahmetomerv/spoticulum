@@ -14,9 +14,9 @@ const AuthRoutes = require('./routes/authRoutes.js');
 application.use('/api', cors(), AuthRoutes);
 
 application.listen(PORT, () => {
-   console.log(`Server started on port ${PORT}`);
+	console.log(`Server started on port ${PORT}`);
 });
 
 if (process.env.NODE_ENV === 'production') {
-   application.use(express.static('client/build'))
+	application.use(express.static('client/build'))
 }

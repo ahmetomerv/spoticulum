@@ -1,4 +1,5 @@
 body {
+	font-family: Lato, 'Helvetica Neue', Arial, Helvetica, sans-serif;
 	padding: 1em;
 }
 
@@ -7,6 +8,14 @@ body {
 	justify-content: center;
 	height: 100vh;
 	align-items: center;
+}
+
+.request-type-form {
+	margin-bottom: 3em;
+}
+
+.request-type-form-group {
+	justify-content: center;
 }
 
 .login-container {
