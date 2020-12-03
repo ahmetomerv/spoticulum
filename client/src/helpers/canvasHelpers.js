@@ -45,7 +45,7 @@ export const initializeCanvasGradient = (context, width, height, color1, color2)
 
 export const downloadCanvasImage = (canvas, name) => {
 	name = name.toLowerCase().replace(' ', '') || '';
-	const fileName = name ? (name + '-' + 'spotify-graph.png') : 'spotify-graph.png';
+	const fileName = name ? (`${name}-spotify-graph.png`) : 'spotify-graph.png';
 
 	if (canvas) {
 		const link = document.createElement('a');
@@ -76,7 +76,6 @@ export const drawCell = (xCell, yCell, color, context, p, imgUrl, cellSize, imgR
 	}
 	
 	img.onload = function() {
-		const randomNum = (Math.floor(Math.random() * 8) + 1) * 500;
 		img.id = "canvas-image";
 		document.body.appendChild(img);
 		let tempImg = document.querySelector("#canvas-image");

@@ -12,6 +12,7 @@ class CanvasGraph extends React.Component {
 		graphIsReady: false,
 		imgResults: [],
 		canvas: null,
+		requestedMediaType: this.props.requestedType,
 	}
 
 	componentDidMount() {
@@ -72,11 +73,6 @@ class CanvasGraph extends React.Component {
 		}
     
 		initializeCanvasGradient(context, width, height, '#EFFFFE', '#11233E');
-    
-		let yCells = 9;
-		let xCells = 9;
-		let gridCenterCellsCount = 4;
-		let steps = (xCells * yCells) - gridCenterCellsCount;
 		
 		let startingXCell = 3;
 		let startingYCell = 3;
@@ -230,11 +226,11 @@ class CanvasGraph extends React.Component {
 			<React.Fragment>
 				{ this.state.isLoading ? <Spinner/> : null }
 				<div className="canvas-container">
+					<h1>Your top { this.props.requestedMediaType === 'tracks' ? 'albums' : this.props.requestedMediaType }:</h1>
 					<div id="canvas"></div>
-
 					<div className="canvas-actions-container">
 						{ this.state.graphIsReady
-							? <a onClick={this.handleDownloadGraphClick} className="button primary-button">Download Graph</a> 
+							? <button onClick={this.handleDownloadGraphClick} className="button primary-button">Download Graph</button> 
 							: <Button className="button loading-button" basic loading>Loading images...</Button>
 						}
 					</div>

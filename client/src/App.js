@@ -125,7 +125,11 @@ class App extends React.Component {
 
 				<div className="container">
 					{ this.state.canGenerateGraph
-						? <CanvasGraph mediaEntities={this.state.mediaEntities} user={this.state.user}/>
+						? <CanvasGraph
+								requestedMediaType={this.state.requestedType}
+								mediaEntities={this.state.mediaEntities}
+								user={this.state.user}
+							/>
 						: <div className="login-container">
 								<div style={{ marginBottom: '5em' }}>
 									<img className="spotify-logo" width="100" src="spotify-logo.png" alt="Spoticulum logo"/>
