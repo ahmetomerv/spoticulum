@@ -5,7 +5,8 @@ const encodeFormData = require('../helperFunctions/encodeFormData.js');
 const querystring = require('querystring');
 
 router.get('/login', async (req, res) => {
-	const scope = `user-modify-playback-state
+	const scope =
+	 `user-modify-playback-state
 	 user-read-playback-state
 	 user-read-currently-playing
 	 user-library-modify
@@ -59,16 +60,16 @@ router.get('/getUser/:token', async (req, res) => {
 	});
 });
 
-router.get('/playlists/:token', async (req, res) => {
-	await fetch('https://api.spotify.com/v1/playlists', {
-		headers: {
-			'Authorization': `Bearer ${req.params.token}`
-		}
-	})
-	.then(response => response.json())
-	.then(data => {
-		res.json(data);
-	});
-});
+// router.get('/playlists/:token', async (req, res) => {
+// 	await fetch('https://api.spotify.com/v1/playlists', {
+// 		headers: {
+// 			'Authorization': `Bearer ${req.params.token}`
+// 		}
+// 	})
+// 	.then(response => response.json())
+// 	.then(data => {
+// 		res.json(data);
+// 	});
+// });
 
 module.exports = router;
