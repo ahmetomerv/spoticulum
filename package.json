@@ -5,6 +5,7 @@
 	"main": "application.js",
 	"scripts": {
 		"start": "node application.js",
+		"deploy": "git push heroku main",
 		"install-client": "cd client && npm install",
 		"build-client": "cd client && npm run build",
 		"heroku-postbuild": "npm run install-client && npm run build-client",
