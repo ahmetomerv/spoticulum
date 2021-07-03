@@ -2,7 +2,8 @@ import './App.css';
 import React from 'react';
 import { Form, Image } from 'semantic-ui-react';
 import Spinner from './Spinner';
-import CanvasGraph from './CanvasGraph/CanvasGraph';
+import CanvasGraph from './components/CanvasGraph/CanvasGraph';
+import MainLogo from './components/MainLogo/MainLogo';
 import mediaEntityMapper from './helpers/mediaEntityMapper';
 import { updateDocumentTitle, getHashParams } from './helpers/utils';
 
@@ -118,32 +119,36 @@ class App extends React.Component {
 	}
 
 	render() {
+		const { isLoading, canGenerateGraph, requestedType, mediaEntities, user } = this.state;
+
+		if (isLoading) {
+			return <Spinner/>;
+		}
 		
 		return (
 			<React.Fragment>
-				{ this.state.isLoading ? <Spinner/> : null }
 
 				<div className="container">
-					{ this.state.canGenerateGraph
+					{ canGenerateGraph
 						? <CanvasGraph
-								requestedMediaType={this.state.requestedType}
-								mediaEntities={this.state.mediaEntities}
-								user={this.state.user}
+								requestedMediaType={requestedType}
+								mediaEntities={mediaEntities}
+								user={user}
 							/>
 						: <div className="login-container">
+							<div>
 								<div style={{ marginBottom: '5em' }}>
-									<img className="spotify-logo" width="100" src="spotify-logo.png" alt="Spoticulum logo"/>
-									<h2>Spoticulum</h2>
+									<MainLogo displayLogoTitle={true} />
 								</div>
 
-								{ this.state.user
+								{ user
 									? <Form className="request-type-form">
 											<Form.Field>
 												<label>
 													Logged in as
 												</label>
-												<Image src={this.state.user.images.length ? this.state.user.images[0].url : 'default-profile-icon-16.jpg'} bordered avatar />
-												<span>{ this.state.user.display_name }</span>
+												<Image src={user.images.length ? user.images[0].url : 'default-profile-icon-16.jpg'} bordered avatar />
+												<span>{ user.display_name }</span>
 											</Form.Field>
 											<br/>
 											<Form.Field>
@@ -155,13 +160,13 @@ class App extends React.Component {
 												<Form.Radio
 													label='Artists'
 													value='artists'
-													checked={this.state.requestedType === 'artists'}
+													checked={requestedType === 'artists'}
 													onChange={this.handleTypeChange}
 												/>
 												<Form.Radio
 													label='Albums'
 													value='tracks'
-													checked={this.state.requestedType === 'tracks'}
+													checked={requestedType === 'tracks'}
 													onChange={this.handleTypeChange}
 												/>
 											</Form.Group>
@@ -173,6 +178,7 @@ class App extends React.Component {
 								}
 
 							</div>
+						</div>
 					}
 				</div>
 			</React.Fragment>

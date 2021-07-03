@@ -59,9 +59,7 @@ export const downloadCanvasImage = (canvas, name) => {
 	}
 };
 
-export const drawCell = (xCell, yCell, color, context, p, imgUrl, cellSize, imgResultCallback) => {
-	color = color || 'ff3';
-	cellSize = cellSize || 70;
+export const drawCell = (xCell, yCell, color = 'ff3', context, p, imgUrl, cellSize = 50, imgResultCallback) => {
 	const x = xCell * cellSize;
 	const y = yCell * cellSize;
 	const img = new Image();

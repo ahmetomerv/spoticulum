@@ -60,16 +60,4 @@ router.get('/getUser/:token', async (req, res) => {
 	});
 });
 
-// router.get('/playlists/:token', async (req, res) => {
-// 	await fetch('https://api.spotify.com/v1/playlists', {
-// 		headers: {
-// 			'Authorization': `Bearer ${req.params.token}`
-// 		}
-// 	})
-// 	.then(response => response.json())
-// 	.then(data => {
-// 		res.json(data);
-// 	});
-// });
-
 module.exports = router;
