@@ -176,7 +176,6 @@ class App extends React.Component {
 											<a className="button primary-button" href="http://www.spoticulum.xyz/api/login">Login with Spotify</a>
 										</React.Fragment>
 								}
-
 							</div>
 						</div>
 					}
