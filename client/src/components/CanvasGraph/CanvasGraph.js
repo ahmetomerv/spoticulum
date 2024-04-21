@@ -2,22 +2,116 @@ import React from 'react';
 import { Button } from 'semantic-ui-react';
 import { createHiDPICanvas, initializeCanvasGradient, drawCell, downloadCanvasImage } from '../../helpers/canvasHelpers';
 import './style.css';
+import { updateDocumentTitle, getHashParams, getRandomColor } from '../../helpers/utils';
+import mediaEntityMapper from '../../helpers/mediaEntityMapper';
+import { withRouter } from '../../withRouter';
 
 class CanvasGraph extends React.Component {
 
 	state = {
-		mediaEntities: this.props.mediaEntities,
-		user: this.props.user,
 		graphIsReady: false,
 		imgResults: [],
 		canvas: null,
-		requestedMediaType: this.props.requestedType,
+		timeRange: 'medium_term',
+		isLoading: false,
+		error: null,
+		nextUrl: '',
+		mediaEntities: [],
 	}
 
 	componentDidMount() {
-		if (this.state.mediaEntities && this.state.mediaEntities.length && this.state.user) {
-			this.createSpotifyGraph();
+		const params = getHashParams();
+
+		if (params) {
+			this.setState({
+				accessToken: params.access_token,
+				refreshToken: params.refresh_token,
+				expiresIn: params.expires_in,
+				scope: params.scope,
+				tokenType: params.token_type,
+				graphRequestType: params.graph_request_type
+			}, () => {
+				this.getAuthenticatedUser(params.access_token);
+				const getTopCallback = () => {
+					if (this.state.nextUrl) {
+						this.getTop(params.access_token, params.graph_request_type, this.state.nextUrl, getTopCallback);
+					} else {
+						this.createSpotifyGraph();
+					}
+				}
+
+				this.getTop(params.access_token, params.graph_request_type, null, () => {
+					this.getTop(params.access_token, params.graph_request_type, this.state.nextUrl, getTopCallback);
+				});
+			});
 		}
+	}
+
+	getAuthenticatedUser = (accessToken) => {
+		this.setState({ isLoading: true });
+		const url = 'https://api.spotify.com/v1/me';
+		const headers = {
+			Authorization: 'Bearer ' + accessToken
+		}
+
+		fetch(url, { headers })
+			.then(response => response.json())
+			.then(data => {
+				this.setState({ user: data });
+				if (data && data.display_name) {
+					updateDocumentTitle(data.display_name);
+				}
+			})
+			.catch(error => {
+				this.setState({ error });
+			})
+			.finally(() => {
+				this.setState({ isLoading: false });
+			});
+	}
+
+	getTop = (accessToken, requestedType, nextUrl, callback) => {
+		this.setState({ isLoading: true });
+		let url;
+		let params = new URLSearchParams({ time_range: this.state.timeRange });
+		const headers = {
+			Authorization: 'Bearer ' + accessToken
+		};
+
+		if (nextUrl && nextUrl.length > 0) {
+			url = nextUrl;
+		} else {
+			url = 'https://api.spotify.com/v1/me/top/' + requestedType + '?' + params;
+		}
+
+		fetch(url , { headers })
+			.then(response => response.json())
+			.then(res => {
+				const data = res.items.map(mediaEntityMapper);
+				if (res.offset === 80) {
+					this.setState({
+						mediaEntities: [...this.state.mediaEntities, ...data],
+						nextUrl: null,
+					});
+					return;
+				}
+				this.setState({
+					mediaEntities: [...this.state.mediaEntities, ...data],
+					nextUrl: res.next,
+				});
+			})
+			.catch(error => {
+				this.setState({ error });
+			})
+			.finally(() => {
+				callback();
+				this.setState({ isLoading: false });
+			});
+	}
+
+	goBackClickHandler = () => {
+    const queryParams = new URLSearchParams(window.location.search);
+    this.props.navigate('/?' + queryParams.toString());
 	}
 
 	imgLoadCallback = (status) => {
@@ -73,8 +167,11 @@ class CanvasGraph extends React.Component {
 			context.lineTo(canvas.width, y);
 			context.stroke();
 		}
-    
-		initializeCanvasGradient(context, width, height, '#EFFFFE', '#11233E');
+
+		const firstGradientColor = getRandomColor();
+		const secondGradientColor = getRandomColor();
+
+		initializeCanvasGradient(context, width, height, firstGradientColor, secondGradientColor);
 
 		let startingXCell = 3;
 		let startingYCell = 3;
@@ -94,12 +191,21 @@ class CanvasGraph extends React.Component {
     let cellIndexCounter = 0;
 		let stepsToTake = stepsToTakeRight + stepsToTakeBottom + stepsToTakeLeft + stepsToTakeTop;
 
-		const profileUrl = this.state.user.images[0].url;
+		let profileUrl;
+
+		if (this.state.user.images.length > 1) {
+			profileUrl = this.state.user.images[1].url;
+		} else if (this.state.user.images.length > 0) {
+			profileUrl = this.state.user.images[0].url;
+		} else {
+			profileUrl = 'default_profile_url.jpg';
+		}
+
 		drawCell(2, 2, null, context, padding, profileUrl, profileCellSize, this.imgLoadCallback);
 
-		let myLoop;
+		let canvasLoop;
 
-		(myLoop = (z) => {
+		(canvasLoop = (z) => {
       setTimeout(() => {
         for (let i = 0; i < stepsToTake; i++) {
           if (stepsToTakeRight !== 0) {
@@ -181,7 +287,7 @@ class CanvasGraph extends React.Component {
             stepsToTake = stepsToTakeRight + stepsToTakeBottom + stepsToTakeLeft + stepsToTakeTop;
           }
         }
-        if (--z) myLoop(z);
+        if (--z) canvasLoop(z);
       }, 500);
     })(rowsCount);
 
@@ -194,12 +300,12 @@ class CanvasGraph extends React.Component {
 				30, 30
 			);
 
-			context.fillStyle = '#46596C';
-			context.font = 'normal 14px sans-serif';
+			context.fillStyle = secondGradientColor;
+			context.font = 'bold 15px sans-serif';
 			context.fillText('spoticulum.xyz', 110 + padding, height - 42);
 
-			context.fillStyle = '#CCDCE0';
-			context.font = 'italic 14px sans-serif';
+			context.fillStyle = firstGradientColor;
+			context.font = 'bold 15px sans-serif';
 			context.fillText(this.state.user.display_name, width - 150 + padding, height - 42);
 		}
 	}
@@ -228,11 +334,16 @@ class CanvasGraph extends React.Component {
 			<React.Fragment>
 				<div className="canvas-container">
 					<div className="canvas-content">
-						<h1>Your top { this.props.requestedMediaType === 'tracks' ? 'albums' : this.props.requestedMediaType }:</h1>
+						<h1>Your top { this.state.graphRequestType === 'tracks' ? 'albums' : this.state.graphRequestType }:</h1>
 						<div id="canvas"></div>
 						<div className="canvas-actions-container">
 							{ graphIsReady
-								? <button onClick={this.handleDownloadGraphClick} className="button primary-button">Download Graph</button> 
+								? (
+									<div>
+										<Button onClick={this.handleDownloadGraphClick} positive>Download Graph</Button>
+										<Button onClick={this.goBackClickHandler}>Go Back</Button>
+									</div>
+								) 
 								: <Button disabled className="button loading-button" basic loading>Loading images...</Button>
 							}
 						</div>
@@ -241,7 +352,6 @@ class CanvasGraph extends React.Component {
 			</React.Fragment>
 		)
 	}
-
 }
 
-export default CanvasGraph;
+export default withRouter(CanvasGraph);

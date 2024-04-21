@@ -15,10 +15,6 @@ body {
   }
 }
 
-.request-type-form {
-	margin-bottom: 3em;
-}
-
 .request-type-form-group {
 	justify-content: center;
 }
@@ -36,6 +32,10 @@ body {
 	margin-bottom: 1em;
 }
 
+.login-container .image {
+	margin-right: .5em !important;
+}
+
 .button {
 	display: inline-block;
 	padding: .6em 2em;
@@ -45,6 +45,7 @@ body {
 	font-weight: bold;
 	cursor: pointer;
 	outline: none;
+	border: 3px solid #2d614900 !important;
 }
 
 .button:active {
