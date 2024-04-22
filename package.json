@@ -5,9 +5,7 @@
 	"main": "application.js",
 	"scripts": {
 		"start": "node application.js",
-		"install-client": "cd client && npm install",
-		"build-client": "cd client && npm run build",
-		"postbuild": "npm run install-client && npm run build-client",
+		"build-client": "cd client && npm install && npm run build",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"author": "Ahmet Ömer",
