@@ -1,8 +1,8 @@
-const express = require('express');
+import express from 'express';
 const router = express.Router();
-const fetch = require('node-fetch');
-const encodeFormData = require('../helperFunctions/encodeFormData.js');
-const querystring = require('querystring');
+import encodeFormData from '../helperFunctions/encodeFormData.js';
+import querystring from 'querystring'
+import fetch from "node-fetch";
 
 router.get('/login', async (req, res) => {
 	const scope =
@@ -57,4 +57,4 @@ router.get('/getUser/:token', async (req, res) => {
 	});
 });
 
-module.exports = router;
+export default router;

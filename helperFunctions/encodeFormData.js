@@ -4,4 +4,4 @@ const encodeFormData = (data) => {
 		.join('&');
 }
 
-module.exports = encodeFormData;
+export default encodeFormData;
