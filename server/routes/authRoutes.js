@@ -1,8 +1,8 @@
 import express from 'express';
-const router = express.Router();
 import encodeFormData from '../helperFunctions/encodeFormData.js';
 import querystring from 'querystring'
 import fetch from "node-fetch";
+const router = express.Router();
 
 router.get('/login', async (req, res) => {
 	const scope =
