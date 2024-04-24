@@ -113,7 +113,7 @@ class Home extends React.Component {
                       <br/><br/>
                       <Image src={profileUrl} bordered avatar />
                       <span>
-                        <a href={user.external_urls?.spotify} target='_blank'>
+                        <a href={user.external_urls?.spotify} target='_blank' rel="noreferrer">
                           { user.display_name }
                         </a>
                       </span>
