@@ -1,5 +1,5 @@
 import express from 'express';
-import encodeFormData from '../helperFunctions/encodeFormData.js';
+import encodeFormData from '../helpers/encodeFormData.js';
 import querystring from 'querystring'
 import fetch from "node-fetch";
 const router = express.Router();
