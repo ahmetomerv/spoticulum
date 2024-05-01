@@ -45,7 +45,7 @@ export const initializeCanvasGradient = (context, width, height, color1, color2)
 
 export const downloadCanvasImage = (canvas, name) => {
 	name = name.toLowerCase().replace(' ', '') || '';
-	const fileName = name ? (`${name}-spotify-graph.png`) : 'spotify-graph.png';
+	const fileName = name ? (`${name}-spotify-collection.png`) : 'spotify-collection.png';
 
 	if (canvas) {
 		const link = document.createElement('a');

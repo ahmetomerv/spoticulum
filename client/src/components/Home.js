@@ -1,11 +1,31 @@
 import React from 'react';
-import { Form, Image, Button, Divider, Segment } from 'semantic-ui-react';
+import {
+  Form,
+  Image,
+  Button,
+  Divider,
+  Segment,
+  ModalHeader,
+  ModalContent,
+  ModalActions,
+  Modal,
+  Icon,
+  Container,
+  Grid,
+  Header,
+  Popup,
+} from 'semantic-ui-react';
 import Spinner from './../Spinner';
 import { withRouter } from '../withRouter';
 import MainLogo from './MainLogo/MainLogo';
 import { updateDocumentTitle, getHashParams } from '../helpers/utils';
 
 class Home extends React.Component {
+
+  constructor(props) {
+    super(props);
+    this.handleModal = this.handleModal.bind(this);
+  }
 
   state = {
 		accessToken: '',
@@ -16,6 +36,7 @@ class Home extends React.Component {
 		error: null,
 		user: null,
 		isLoading: false,
+    exampleModalOpen: false,
 	}
 
   componentDidMount() {
@@ -62,13 +83,37 @@ class Home extends React.Component {
 
   handleTypeChange = (value) => (e) => {
     const queryParams = new URLSearchParams(window.location.search);
-    queryParams.append('graph_request_type', value);
-    this.props.navigate('/graph?' + queryParams.toString());
+    queryParams.append('collection_request_type', value);
+    this.props.navigate('/collection?' + queryParams.toString());
 	}
 
+  isDev = () => {
+    return !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
+  }
+
+  handleModal(boolean) {
+    this.setState({ exampleModalOpen: boolean });
+  }
+
   render() {
-		const { isLoading, user } = this.state;
+		const { isLoading, user, exampleModalOpen } = this.state;
+
+    const copyToClipboard = () => {
+      navigator.clipboard.writeText('ahmetomerv@gmail.com')
+        .then(() => {})
+        .catch((error) => {
+          console.error('Error copying text to clipboard:', error);
+        });
+    };
+
+    let loginUrl = 'https://spoticulum.xyz/api/login';
+
+    if (this.isDev()) {
+      loginUrl = 'http://localhost:8888/api/login';
+    }
+
     let profileUrl = 'default-profile-icon-16.jpg';
+    const exampleCollectionUrl = 'example-collection.png';
 
     if (user && user.images) {
       profileUrl = user.images[0].url;
@@ -121,7 +166,7 @@ class Home extends React.Component {
                     <br/>
                     <Form.Field>
                       <label>
-                        Generate based on:
+                        Generate based on what you listen to the most:
                       </label>
                     </Form.Field>
                     <Form.Group className="request-type-form-group">
@@ -138,12 +183,56 @@ class Home extends React.Component {
                     </div>
                   </Form>
                 : <React.Fragment>
-                    <p className="login-info">Login to generate your profile graph based on what you listen to the most.<br/>Authentication is safe and handled by Spotify.</p>
-                    <a className="button primary-button" href="http://localhost:8888/api/login">Login with Spotify</a>
+                    <div className="login-info">
+                      Login to generate your Spotify <Popup content='See example collection' trigger={ <span className='example-click' onClick={() => this.handleModal(true)}>collection
+                      </span> }/> based on what you listen to the most.
+                      <br/>
+                      Authentication is handled by Spotify.
+                    </div>
+                    <a className="button primary-button" href={loginUrl}>Login with Spotify</a>
+                    <Modal
+                      onClose={() => this.handleModal(false)}
+                      onOpen={() => this.handleModal(true)}
+                      open={exampleModalOpen}
+                    >
+                      <ModalHeader>Example:</ModalHeader>
+                      <ModalContent image>
+                        <Image size='massive' src={exampleCollectionUrl} wrapped />
+                      </ModalContent>
+                      <ModalActions>
+                        <Button onClick={() => this.handleModal(false)} positive>
+                          Ok
+                        </Button>
+                      </ModalActions>
+                    </Modal>
                   </React.Fragment>
             }
             </div>
           </div>
+          <Segment inverted vertical style={{ padding: '3em 0em' }}>
+            <Container className='footer'>
+              <Grid divided inverted stackable>
+                <Grid.Row>
+                  <Grid.Column>
+                    <Header style={{ textAlign: 'center', fontWeight: 'normal' }} as={'h5'} inverted>
+                      Made by <a style={{ fontWeight: 'bold' }} href='https://ahmetomer.net'>Ahmet Ömer</a>
+                    </Header>
+                    <div style={{ textAlign: 'center', fontSize: '1.5em' }}>
+                      <a style={{ marginRight: '.6em' }} href='https://github.com/ahmetomerv' target='_blank' rel='noopener noreferrer'>
+                        <Icon name='github' />
+                      </a>
+                      <Popup
+                        content="Click to copy email"
+                        trigger={
+                          <Icon name='mail' link={true} onClick={copyToClipboard} />
+                        }
+                      />
+                    </div>
+                  </Grid.Column>
+                </Grid.Row>
+              </Grid>
+            </Container>
+          </Segment>
 				</div>
 			</React.Fragment>
 		)

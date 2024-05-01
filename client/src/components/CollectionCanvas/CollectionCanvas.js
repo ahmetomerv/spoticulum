@@ -1,18 +1,20 @@
-import React from 'react';
-import { Button } from 'semantic-ui-react';
-import { createHiDPICanvas, initializeCanvasGradient, drawCell, downloadCanvasImage } from '../../helpers/canvasHelpers';
 import './style.css';
+import React from 'react';
+import { createHiDPICanvas, initializeCanvasGradient, drawCell, downloadCanvasImage } from '../../helpers/canvasHelpers';
 import { updateDocumentTitle, getHashParams, getRandomColor } from '../../helpers/utils';
 import mediaEntityMapper from '../../helpers/mediaEntityMapper';
 import { withRouter } from '../../withRouter';
+import ReactGA from "react-ga4";
+import { Button, Header, Segment } from 'semantic-ui-react'
 
-class CanvasGraph extends React.Component {
+
+class CollectionCanvas extends React.Component {
 
 	state = {
-		graphIsReady: false,
+		collectionIsReady: false,
 		imgResults: [],
 		canvas: null,
-		timeRange: 'medium_term',
+		timeRange: 'long_term',
 		isLoading: false,
 		error: null,
 		nextUrl: '',
@@ -29,22 +31,27 @@ class CanvasGraph extends React.Component {
 				expiresIn: params.expires_in,
 				scope: params.scope,
 				tokenType: params.token_type,
-				graphRequestType: params.graph_request_type
+				collectionRequestType: params.collection_request_type
 			}, () => {
 				this.getAuthenticatedUser(params.access_token);
-				const getTopCallback = () => {
-					if (this.state.nextUrl) {
-						this.getTop(params.access_token, params.graph_request_type, this.state.nextUrl, getTopCallback);
-					} else {
-						this.createSpotifyGraph();
-					}
-				}
-
-				this.getTop(params.access_token, params.graph_request_type, null, () => {
-					this.getTop(params.access_token, params.graph_request_type, this.state.nextUrl, getTopCallback);
-				});
+				this.initializeCollectionData();
 			});
 		}
+	}
+
+	initializeCollectionData = () => {
+		const { accessToken, collectionRequestType } = this.state;
+		const getTopCallback = () => {
+			if (this.state.nextUrl) {
+				this.getTop(accessToken, collectionRequestType, this.state.nextUrl, getTopCallback);
+			} else {
+				this.createSpotifyCollection();
+			}
+		}
+
+		this.getTop(accessToken, collectionRequestType, null, () => {
+			this.getTop(accessToken, collectionRequestType, this.state.nextUrl, getTopCallback);
+		});
 	}
 
 	getAuthenticatedUser = (accessToken) => {
@@ -115,28 +122,37 @@ class CanvasGraph extends React.Component {
 	}
 
 	imgLoadCallback = (status) => {
-		this.setState({
-			imgResults: [...this.state.imgResults, status],
-		}, () => {
+		this.setState(prevState => {
+			const updatedImgResults = [...prevState.imgResults, status];
 			const xRowCells = 8;
 			const yRowCells = 8;
 			const profileCells = 4;
-
-			if (this.state.imgResults.length === xRowCells * yRowCells - (profileCells - 1)) {
-				this.setState({
-					graphIsReady: this.state.imgResults.every(x => x),
-				});
+		
+			let updatedCollectionIsReady = prevState.collectionIsReady;
+		
+			if (updatedImgResults.length === xRowCells * yRowCells - (profileCells - 1)) {
+				updatedCollectionIsReady = updatedImgResults.every(x => x);
 			}
+		
+			return {
+				imgResults: updatedImgResults,
+				collectionIsReady: updatedCollectionIsReady,
+			};
 		});
 	}
 
-	handleDownloadGraphClick = () => {
+	handleDownloadCollectionClick = () => {
 		if (this.state.canvas) {
 			downloadCanvasImage(this.state.canvas, this.state.user.display_name);
+			ReactGA.event({
+				category: "main",
+				action: "download",
+				label: this.state.user.display_name + ": User has downloaded a profile collection for " + this.state.collectionRequestType,
+			});
 		}
 	}
 
-	createSpotifyGraph = () => {
+	createSpotifyCollection = () => {
 		const width = 700;
 		const height = 700;
 		const cellWidth = 70;
@@ -207,11 +223,15 @@ class CanvasGraph extends React.Component {
 
 		(canvasLoop = (z) => {
       setTimeout(() => {
+				const { mediaEntities } = this.state;
         for (let i = 0; i < stepsToTake; i++) {
           if (stepsToTakeRight !== 0) {
-            let imgUrl = this.state.mediaEntities[cellIndexCounter] && this.state.mediaEntities[cellIndexCounter].images.length
-							? this.state.mediaEntities[cellIndexCounter].images[0].url
-							: this.getRandomMediaEntityImgUrl(this.state.mediaEntities);
+						let imgUrl = '';
+						if (mediaEntities[cellIndexCounter] && mediaEntities[cellIndexCounter].images.length) {
+							imgUrl = mediaEntities[cellIndexCounter].images[0].url;
+						} else {
+							imgUrl = this.getRandomMediaEntityImgUrl(mediaEntities);
+						}
 
             drawCell(startingXCell + i, startingYCell, null, context, padding, imgUrl, cellSize, this.imgLoadCallback);
             cellIndexCounter++;
@@ -224,9 +244,12 @@ class CanvasGraph extends React.Component {
           }
 
           if (stepsToTakeBottom !== 0 && stepsToTakeRight === 0) {
-            let imgUrl = this.state.mediaEntities[cellIndexCounter] && this.state.mediaEntities[cellIndexCounter].images.length
-							? this.state.mediaEntities[cellIndexCounter].images[0].url
-							: this.getRandomMediaEntityImgUrl(this.state.mediaEntities);
+            let imgUrl = '';
+						if (mediaEntities[cellIndexCounter] && mediaEntities[cellIndexCounter].images.length) {
+							imgUrl = mediaEntities[cellIndexCounter].images[0].url;
+						} else {
+							imgUrl = this.getRandomMediaEntityImgUrl(mediaEntities);
+						}
 
             drawCell(rightStepLastCell.x, startingYCell + stepCounter, null, context, padding, imgUrl, cellSize, this.imgLoadCallback);
             cellIndexCounter++;
@@ -241,9 +264,12 @@ class CanvasGraph extends React.Component {
           }
 
           if (stepsToTakeLeft !== 0 && stepsToTakeBottom === 0) {
-            let imgUrl = this.state.mediaEntities[cellIndexCounter] && this.state.mediaEntities[cellIndexCounter].images.length
-							? this.state.mediaEntities[cellIndexCounter].images[0].url
-							: this.getRandomMediaEntityImgUrl(this.state.mediaEntities);
+            let imgUrl = '';
+						if (mediaEntities[cellIndexCounter] && mediaEntities[cellIndexCounter].images.length) {
+							imgUrl = mediaEntities[cellIndexCounter].images[0].url;
+						} else {
+							imgUrl = this.getRandomMediaEntityImgUrl(mediaEntities);
+						}
 
             drawCell(bottomStepLastCell.x + stepCounter, bottomStepLastCell.y, null, context, padding, imgUrl, cellSize, this.imgLoadCallback);
             cellIndexCounter++;
@@ -258,9 +284,12 @@ class CanvasGraph extends React.Component {
           }
 
           if (stepsToTakeTop !== 0 && stepsToTakeLeft === 0) {
-            let imgUrl = this.state.mediaEntities[cellIndexCounter] && this.state.mediaEntities[cellIndexCounter].images.length
-							? this.state.mediaEntities[cellIndexCounter].images[0].url
-							: this.getRandomMediaEntityImgUrl(this.state.mediaEntities);
+            let imgUrl = '';
+						if (mediaEntities[cellIndexCounter] && mediaEntities[cellIndexCounter].images.length) {
+							imgUrl = mediaEntities[cellIndexCounter].images[0].url;
+						} else {
+							imgUrl = this.getRandomMediaEntityImgUrl(mediaEntities);
+						}
 
             drawCell(leftStepLastCell.x, leftStepLastCell.y - stepCounter, null, context, padding, imgUrl, cellSize, this.imgLoadCallback);
             cellIndexCounter++;
@@ -328,24 +357,33 @@ class CanvasGraph extends React.Component {
    }
 
 	render() {
-		const { graphIsReady } = this.state;
+		const { collectionIsReady } = this.state;
 
 		return (
 			<React.Fragment>
 				<div className="canvas-container">
 					<div className="canvas-content">
-						<h1>Your top { this.state.graphRequestType === 'tracks' ? 'albums' : this.state.graphRequestType }:</h1>
-						<div id="canvas"></div>
-						<div className="canvas-actions-container">
-							{ graphIsReady
-								? (
-									<div>
-										<Button onClick={this.handleDownloadGraphClick} positive>Download Graph</Button>
-										<Button onClick={this.goBackClickHandler}>Go Back</Button>
-									</div>
-								) 
-								: <Button disabled className="button loading-button" basic loading>Loading images...</Button>
-							}
+						<Header as='h1' block attached='top'>
+							&#128189; Your top { this.state.collectionRequestType === 'tracks' ? 'albums' : this.state.collectionRequestType }
+							<p style={{ fontSize: '.5em', fontWeight: 'normal', color: '#5f5f5f' }}>This is a collection of what you listened to the most for the last year.</p>
+						</Header>
+						<Segment attached>
+							<div id="canvas"></div>
+							<div className="canvas-actions-container">
+								{ collectionIsReady
+									? (
+										<div>
+											<Button negative onClick={() => window.location.href = '/' }>Log out</Button>
+											<Button style={{ margin: '0 1em' }} onClick={this.handleDownloadCollectionClick} positive>Download Collection</Button>
+											<Button onClick={this.goBackClickHandler}>Go Back</Button>
+										</div>
+									) 
+									: <Button disabled className="button loading-button" basic loading>Loading images...</Button>
+								}
+							</div>
+						</Segment>
+						<div>
+							{ collectionIsReady ? <p style={{ textAlign: 'center', marginTop: '5em', color: '#a5a5a5' }}>Tip: Background colors are automatically generated. You can redo it to see different colors.</p> : null}
 						</div>
 					</div>
 				</div>
@@ -354,4 +392,4 @@ class CanvasGraph extends React.Component {
 	}
 }
 
-export default withRouter(CanvasGraph);
+export default withRouter(CollectionCanvas);
