@@ -48,16 +48,29 @@ export const downloadCanvasImage = (canvas, name) => {
 	const fileName = name ? (`${name}-spotify-collection.png`) : 'spotify-collection.png';
 
 	if (canvas) {
-		const link = document.createElement('a');
 		const data = canvas.toDataURL('image/png');
-
-		canvas.setAttribute('crossorigin', '');
-		link.style.display = 'none';
+		const blob = dataURItoBlob(data);
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
 		link.download = fileName;
-		link.href = data;
 		link.click();
+		URL.revokeObjectURL(url);
 	}
 };
+
+function dataURItoBlob(dataURI) {
+	const byteString = atob(dataURI.split(',')[1]);
+	const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+	const arrayBuffer = new ArrayBuffer(byteString.length);
+	const uint8Array = new Uint8Array(arrayBuffer);
+
+	for (let i = 0; i < byteString.length; i++) {
+		uint8Array[i] = byteString.charCodeAt(i);
+	}
+
+	return new Blob([arrayBuffer], { type: mimeString });
+}
 
 export const drawCell = (xCell, yCell, color = 'ff3', context, p, imgUrl, cellSize = 50, imgResultCallback) => {
 	const x = xCell * cellSize;
