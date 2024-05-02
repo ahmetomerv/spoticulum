@@ -9,10 +9,6 @@ import {
   ModalContent,
   ModalActions,
   Modal,
-  Icon,
-  Container,
-  Grid,
-  Header,
   Popup,
 } from 'semantic-ui-react';
 import Spinner from './../Spinner';
@@ -98,14 +94,6 @@ class Home extends React.Component {
   render() {
 		const { isLoading, user, exampleModalOpen } = this.state;
 
-    const copyToClipboard = () => {
-      navigator.clipboard.writeText('ahmetomerv@gmail.com')
-        .then(() => {})
-        .catch((error) => {
-          console.error('Error copying text to clipboard:', error);
-        });
-    };
-
     let loginUrl = 'https://spoticulum.xyz/api/login';
 
     if (this.isDev()) {
@@ -143,7 +131,7 @@ class Home extends React.Component {
 
 		return (
 			<React.Fragment>
-				<div className="container">
+				<div className="home-container">
           <div className="login-container">
             <div>
               <div style={{ marginBottom: '5em' }}>
@@ -209,30 +197,6 @@ class Home extends React.Component {
             }
             </div>
           </div>
-          <Segment inverted vertical style={{ padding: '3em 0em' }}>
-            <Container className='footer'>
-              <Grid divided inverted stackable>
-                <Grid.Row>
-                  <Grid.Column>
-                    <Header style={{ textAlign: 'center', fontWeight: 'normal' }} as={'h5'} inverted>
-                      Made by <a style={{ fontWeight: 'bold' }} href='https://ahmetomer.net'>Ahmet Ömer</a>
-                    </Header>
-                    <div style={{ textAlign: 'center', fontSize: '1.5em' }}>
-                      <a style={{ marginRight: '.6em' }} href='https://github.com/ahmetomerv' target='_blank' rel='noopener noreferrer'>
-                        <Icon name='github' />
-                      </a>
-                      <Popup
-                        content="Click to copy email"
-                        trigger={
-                          <Icon name='mail' link={true} onClick={copyToClipboard} />
-                        }
-                      />
-                    </div>
-                  </Grid.Column>
-                </Grid.Row>
-              </Grid>
-            </Container>
-          </Segment>
 				</div>
 			</React.Fragment>
 		)

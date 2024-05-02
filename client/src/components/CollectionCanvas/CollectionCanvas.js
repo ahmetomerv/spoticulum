@@ -7,7 +7,6 @@ import { withRouter } from '../../withRouter';
 import ReactGA from "react-ga4";
 import { Button, Header, Segment } from 'semantic-ui-react'
 
-
 class CollectionCanvas extends React.Component {
 
 	state = {
@@ -372,18 +371,18 @@ class CollectionCanvas extends React.Component {
 							<div className="canvas-actions-container">
 								{ collectionIsReady
 									? (
-										<div>
+										<React.Fragment>
 											<Button negative onClick={() => window.location.href = '/' }>Log out</Button>
 											<Button style={{ margin: '0 1em' }} onClick={this.handleDownloadCollectionClick} positive>Download Collection</Button>
 											<Button onClick={this.goBackClickHandler}>Go Back</Button>
-										</div>
+										</React.Fragment>
 									) 
 									: <Button disabled className="button loading-button" basic loading>Loading images...</Button>
 								}
 							</div>
 						</Segment>
-						<div>
-							{ collectionIsReady ? <p style={{ textAlign: 'center', marginTop: '5em', color: '#a5a5a5' }}>Tip: Background colors are automatically generated. You can redo it to see different colors.</p> : null}
+						<div className='tip-text-container'>
+							{ collectionIsReady ? <p className='tip-text'>Tip: Background colors are automatically generated. You can redo it to see different colors.</p> : null}
 						</div>
 					</div>
 				</div>
