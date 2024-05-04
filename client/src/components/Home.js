@@ -172,7 +172,7 @@ class Home extends React.Component {
                   </Form>
                 : <React.Fragment>
                     <div className="login-info">
-                      Login to generate your Spotify <Popup content='See example collection' trigger={ <span className='example-click' onClick={() => this.handleModal(true)}>collection
+                      Login to generate your Spotify <Popup content='Click to see example collection' trigger={ <span className='example-click' onClick={() => this.handleModal(true)}>collection
                       </span> }/> based on what you listen to the most.
                       <br/>
                       Authentication is handled by Spotify.

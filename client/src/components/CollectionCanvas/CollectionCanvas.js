@@ -316,7 +316,7 @@ class CollectionCanvas extends React.Component {
           }
         }
         if (--z) canvasLoop(z);
-      }, 500);
+      }, 900);
     })(rowsCount);
 
 		const logo = new Image();

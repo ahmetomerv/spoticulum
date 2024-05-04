@@ -87,9 +87,9 @@ export const drawCell = (xCell, yCell, color = 'ff3', context, p, imgUrl, cellSi
 	}
 	
 	img.onload = function() {
-		img.id = "canvas-image";
+		img.id = 'canvas-image';
 		document.body.appendChild(img);
-		let tempImg = document.querySelector("#canvas-image");
+		let tempImg = document.querySelector('#canvas-image');
 		img.width = tempImg.width;
 		img.height = tempImg.height;
 		document.body.removeChild(tempImg);
@@ -120,8 +120,7 @@ export const drawCell = (xCell, yCell, color = 'ff3', context, p, imgUrl, cellSi
 							imgResultCallback(true);
 						}
 					}
-
-				}, 50);
+				}, 40);
 			})();
 		}
 	};
