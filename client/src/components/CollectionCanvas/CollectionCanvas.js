@@ -176,7 +176,7 @@ class CollectionCanvas extends React.Component {
 			context.moveTo(x, 0);
 			context.lineTo(x, canvas.height);
 			context.stroke();
-			
+
 			const y = i * cellWidth;
 			context.moveTo(0, y);
 			context.lineTo(canvas.width, y);
