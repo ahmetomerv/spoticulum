@@ -144,9 +144,9 @@ class CollectionCanvas extends React.Component {
 		if (this.state.canvas) {
 			downloadCanvasImage(this.state.canvas, this.state.user.display_name);
 			ReactGA.event({
-				category: "main",
-				action: "download",
-				label: this.state.user.display_name + ": User has downloaded a profile collection for " + this.state.collectionRequestType,
+				category: 'main',
+				action: 'download',
+				label: 'User has downloaded a profile collection',
 			});
 		}
 	}
