@@ -133,8 +133,7 @@ class Home extends React.Component {
 			<React.Fragment>
 				<div className="home-container">
           <div className="login-container">
-            <div>
-              <div style={{ marginBottom: '5em' }}>
+              <div style={{ marginBottom: '3em' }}>
                 <MainLogo displayLogoTitle={true} />
               </div>
               { user
@@ -172,12 +171,13 @@ class Home extends React.Component {
                   </Form>
                 : <React.Fragment>
                     <div className="login-info">
-                      Login to generate your Spotify <Popup content='Click to see example collection' trigger={ <span className='example-click' onClick={() => this.handleModal(true)}>collection
-                      </span> }/> based on what you listen to the most.
-                      <br/>
-                      Authentication is handled by Spotify.
+                      Create your personalized Spotify <Popup content='Click to see example collection' trigger={ <span className='example-click' onClick={() => this.handleModal(true)}>collection
+                      </span> }/> snapshot based on what you listen to the most.
                     </div>
                     <a className="button primary-button" href={loginUrl}>Login with Spotify</a>
+                    <br/>
+                    <br/>
+                    <p>Authentication is handled by Spotify.</p>
                     <Modal
                       onClose={() => this.handleModal(false)}
                       onOpen={() => this.handleModal(true)}
@@ -194,8 +194,7 @@ class Home extends React.Component {
                       </ModalActions>
                     </Modal>
                   </React.Fragment>
-            }
-            </div>
+              }
           </div>
 				</div>
 			</React.Fragment>

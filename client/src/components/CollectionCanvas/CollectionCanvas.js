@@ -213,7 +213,7 @@ class CollectionCanvas extends React.Component {
 		} else if (this.state.user.images.length > 0) {
 			profileUrl = this.state.user.images[0].url;
 		} else {
-			profileUrl = 'default_profile_url.jpg';
+			profileUrl = 'spoticulum-logo.png';
 		}
 
 		drawCell(2, 2, null, context, padding, profileUrl, profileCellSize, this.imgLoadCallback);
@@ -334,7 +334,7 @@ class CollectionCanvas extends React.Component {
 
 			context.fillStyle = firstGradientColor;
 			context.font = 'bold 15px sans-serif';
-			context.fillText(this.state.user.display_name, width - 150 + padding, height - 42);
+			context.fillText(this.state.user.display_name, width - 185 + padding, height - 42);
 		}
 	}
 	
@@ -364,7 +364,7 @@ class CollectionCanvas extends React.Component {
 					<div className="canvas-content">
 						<Header as='h1' block attached='top'>
 							&#128189; Your top { this.state.collectionRequestType === 'tracks' ? 'albums' : this.state.collectionRequestType }
-							<p style={{ fontSize: '.5em', fontWeight: 'normal', color: '#5f5f5f' }}>This is a collection of what you listened to the most for the last year.</p>
+							<p style={{ fontSize: '.5em', fontWeight: 'normal', color: '#5f5f5f' }}>Here's your collection of what you listened to the most for the last year.</p>
 						</Header>
 						<Segment attached>
 							<div id="canvas"></div>
