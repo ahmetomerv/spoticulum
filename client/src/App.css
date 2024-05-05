@@ -18,7 +18,9 @@ body {
 	align-items: end;
 }
 
-.home-container, .canvas-container {
+.home-container,
+.canvas-container,
+.legal-container {
   flex: 0 0 85%;
 	background: rgb(255,255,255);
 	background: -moz-radial-gradient(circle, rgb(255 255 255) 0%, rgb(225 196 235 / 90%) 100%);
@@ -35,6 +37,24 @@ body {
 	background: -webkit-linear-gradient(90deg, rgba(30,0,43,1) 0%, rgba(32,17,84,1) 50%, rgba(32,49,55,1) 100%) !important;
 	background: linear-gradient(90deg, rgba(30,0,43,1) 0%, rgba(32,17,84,1) 50%, rgba(32,49,55,1) 100%) !important;
 	filter: progid:DXImageTransform.Microsoft.gradient(startColorstr="#1e002b",endColorstr="#203137",GradientType=1) !important;
+}
+
+.footer-divider {
+	margin: 2em 0 !important;
+}
+
+.legal-container {
+	background: #fff;
+	padding: 6em 33em;
+}
+
+.legal-container p {
+	font-size: 1.1em;
+}
+
+.footer .legal-link {
+	margin: 0 .3em;
+	font-size: .6em;
 }
 
 .container {

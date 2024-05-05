@@ -6,7 +6,10 @@ import {
   Grid,
   Header,
   Popup,
+  Divider,
 } from 'semantic-ui-react';
+import { withRouter } from '../withRouter';
+import { Link } from 'react-router-dom';
 
 class Footer extends React.Component {
   constructor(props) {
@@ -51,6 +54,9 @@ class Footer extends React.Component {
                   <a style={{ marginRight: '.6em' }} href='https://github.com/ahmetomerv' target='_blank' rel='noopener noreferrer'>
                     <Icon name='github' />
                   </a>
+                  <a style={{ marginRight: '.6em' }} href='https://twitter.com/eswordert' target='_blank' rel='noopener noreferrer'>
+                    <Icon name='twitter' />
+                  </a>
                   <Popup
                     size='small'
                     content={this.state.footerPopoverContent}
@@ -61,6 +67,10 @@ class Footer extends React.Component {
                       </a>
                     }
                   />
+                  <Divider className='footer-divider'  />
+                  <div>
+                    <Link className='legal-link' to='/legal'>Terms of Service & Privacy Policy</Link>
+                  </div>
                 </div>
               </Grid.Column>
             </Grid.Row>
@@ -71,4 +81,4 @@ class Footer extends React.Component {
 	}
 }
 
-export default Footer;
+export default withRouter(Footer);
