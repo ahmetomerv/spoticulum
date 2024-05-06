@@ -103,7 +103,7 @@ class Home extends React.Component {
     let profileUrl = 'default-profile-icon-16.jpg';
     const exampleCollectionUrl = 'example-collection.png';
 
-    if (user && user.images) {
+    if (user && user.images && user.images) {
       profileUrl = user.images[0].url;
     }
 
