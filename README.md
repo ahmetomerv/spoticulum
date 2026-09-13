@@ -34,6 +34,9 @@ Open `http://127.0.0.1:3000`. The API runs on port 8888. Vite also proxies `/api
 to that port. Press `Ctrl+C` to stop both processes. The browser uses same-origin
 `/api/login`, `/api/me`, `/api/top/:type`, and `/api/logout` routes; Spotify
 tokens stay in the Express session and are never returned in client URLs.
+Access tokens are refreshed server-side before expiry. If Spotify rejects both
+the access token and its refresh token, the session is cleared and the user is
+prompted to reconnect.
 
 The public analytics setting accepts `VITE_GA` or the original `REACT_APP_GA`.
 Only this setting is exposed by the Vite compatibility configuration. Analytics

@@ -35,12 +35,15 @@ class Home extends React.Component {
 			const params = new URLSearchParams(window.location.search);
 			const authError = params.get('auth_error');
 			if (authError) {
-				this.setState({ error: new Error('Spotify authorization was cancelled or failed.') });
-				this.props.navigate('/', { replace: true });
+				const message = authError === 'session_expired'
+					? 'Your Spotify session expired. Connect again to continue.'
+					: 'Spotify authorization was cancelled or failed.';
+				this.setState({ error: new Error(message) });
+				window.history.replaceState({}, '', '/');
 				return;
 			}
 			if (params.get('auth')) {
-				this.props.navigate('/', { replace: true });
+				window.history.replaceState({}, '', '/');
 			}
 			this.getAuthenticatedUser();
 		}
@@ -108,9 +111,9 @@ class Home extends React.Component {
 	            { this.state.error.message }
 	          </div>
 	          <div>
-	          <Button onClick={() => this.setState({ error: null })}>
-	            Home
-	          </Button>
+						<a className="button primary-button" href="/api/login">
+							Reconnect with Spotify
+						</a>
 	          </div>
         </div>
       )

@@ -85,7 +85,10 @@ function appendSetCookie(res, header) {
 }
 
 function tokenExpiresAt(data) {
-  return Date.now() + Number(data.expires_in || 3600) * 1000;
+  const expiresIn = Number(data.expires_in);
+  const lifetime =
+    Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600;
+  return Date.now() + lifetime * 1000;
 }
 
 export function createAuthRoutes({
@@ -182,42 +185,91 @@ export function createAuthRoutes({
     return null;
   };
 
-  const ensureAccessToken = async (session) => {
-    if (session.expiresAt - Date.now() > MIN_TOKEN_TTL_MS) {
-      return session.accessToken;
-    }
+  const refreshAccessToken = async (session, staleAccessToken) => {
+    if (session.accessToken !== staleAccessToken) return session.accessToken;
+    if (session.refreshPromise) return session.refreshPromise;
     if (!session.refreshToken) {
       const error = new Error("Spotify session expired");
       error.status = 401;
       throw error;
     }
-    const data = await spotifyRequest(
-      "https://accounts.spotify.com/api/token",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
-        },
-        body: new URLSearchParams({
-          grant_type: "refresh_token",
-          refresh_token: session.refreshToken,
-          client_id: env.CLIENT_ID,
-          client_secret: env.CLIENT_SECRET,
-        }),
-      },
-    );
-    session.accessToken = data.access_token;
-    session.refreshToken = data.refresh_token || session.refreshToken;
-    session.tokenType = data.token_type || session.tokenType;
-    session.scope = data.scope || session.scope;
-    session.expiresAt = tokenExpiresAt(data);
-    return session.accessToken;
+    session.refreshPromise = (async () => {
+      let data;
+      try {
+        data = await spotifyRequest("https://accounts.spotify.com/api/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
+          body: new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: session.refreshToken,
+            client_id: env.CLIENT_ID,
+            client_secret: env.CLIENT_SECRET,
+          }),
+        });
+      } catch (error) {
+        if (
+          error.status === 400 &&
+          error.spotifyError?.error === "invalid_grant"
+        ) {
+          error.status = 401;
+        }
+        throw error;
+      }
+      if (!data.access_token) {
+        const error = new Error("Spotify returned an invalid token response");
+        error.status = 502;
+        throw error;
+      }
+      session.accessToken = data.access_token;
+      session.refreshToken = data.refresh_token || session.refreshToken;
+      session.tokenType = data.token_type || session.tokenType;
+      session.scope = data.scope || session.scope;
+      session.expiresAt = tokenExpiresAt(data);
+      return session.accessToken;
+    })();
+    try {
+      return await session.refreshPromise;
+    } finally {
+      delete session.refreshPromise;
+    }
   };
 
-  const sendSpotifyError = (res, error) => {
+  const ensureAccessToken = async (session) => {
+    if (session.expiresAt - Date.now() > MIN_TOKEN_TTL_MS) {
+      return session.accessToken;
+    }
+    return refreshAccessToken(session, session.accessToken);
+  };
+
+  const spotifyUserRequest = async (session, url, options = {}) => {
+    const requestWithToken = (accessToken) =>
+      spotifyRequest(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+    const accessToken = await ensureAccessToken(session);
+    try {
+      return await requestWithToken(accessToken);
+    } catch (error) {
+      if (error.status !== 401) throw error;
+      const refreshedAccessToken = await refreshAccessToken(
+        session,
+        accessToken,
+      );
+      return requestWithToken(refreshedAccessToken);
+    }
+  };
+
+  const sendSpotifyError = (res, error, stored) => {
     const status = error.status || 502;
     if (status === 401) {
+      if (stored) sessions.delete(stored.sessionId);
       clearAuthCookies(res);
       return res.status(401).json({ error: "Spotify authorization expired" });
     }
@@ -294,14 +346,14 @@ export function createAuthRoutes({
     const stored = requireSession(req, res);
     if (!stored) return;
     try {
-      const accessToken = await ensureAccessToken(stored.session);
-      const data = await spotifyRequest("https://api.spotify.com/v1/me", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const data = await spotifyUserRequest(
+        stored.session,
+        "https://api.spotify.com/v1/me",
+      );
       res.set("Cache-Control", "no-store");
       res.json(data);
     } catch (error) {
-      sendSpotifyError(res, error);
+      sendSpotifyError(res, error, stored);
     }
   });
 
@@ -316,20 +368,19 @@ export function createAuthRoutes({
       return res.status(400).json({ error: "Invalid offset" });
     }
     try {
-      const accessToken = await ensureAccessToken(stored.session);
       const params = new URLSearchParams({
         time_range: "long_term",
         limit: String(TOP_LIMIT),
         offset: String(offset),
       });
-      const data = await spotifyRequest(
+      const data = await spotifyUserRequest(
+        stored.session,
         `https://api.spotify.com/v1/me/top/${req.params.type}?${params}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       res.set("Cache-Control", "no-store");
       res.json(data);
     } catch (error) {
-      sendSpotifyError(res, error);
+      sendSpotifyError(res, error, stored);
     }
   });
 

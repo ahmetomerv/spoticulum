@@ -177,3 +177,22 @@ test("mobile home retains its layout and modal controls", async ({ page }) => {
     await page.evaluate(() => document.documentElement.scrollWidth),
   ).toBeLessThanOrEqual(390);
 });
+
+test("an expired collection session offers an immediate Spotify reconnect", async ({
+  page,
+}) => {
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      status: 401,
+      json: { error: "Spotify authorization expired" },
+    }),
+  );
+  await page.goto("/collection?collection_request_type=artists");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(
+    page.getByText("Your Spotify session expired. Connect again to continue."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Reconnect with Spotify" }),
+  ).toHaveAttribute("href", "/api/login");
+});

@@ -96,6 +96,112 @@ test("callback stores tokens server-side and redirects without exposing them", a
   });
 });
 
+test("access tokens are refreshed server-side before they expire", async () => {
+  let refreshCalls = 0;
+  const fetchImpl = async (url, options) => {
+    if (url === "https://accounts.spotify.com/api/token") {
+      if (options.body.get("grant_type") === "authorization_code") {
+        return Response.json({
+          access_token: "expiring-token",
+          refresh_token: "refresh-token",
+          token_type: "Bearer",
+          expires_in: 30,
+        });
+      }
+      refreshCalls += 1;
+      assert.equal(options.body.get("grant_type"), "refresh_token");
+      assert.equal(options.body.get("refresh_token"), "refresh-token");
+      return Response.json({
+        access_token: "refreshed-token",
+        token_type: "Bearer",
+        expires_in: 3600,
+      });
+    }
+    assert.equal(url, "https://api.spotify.com/v1/me");
+    assert.equal(options.headers.Authorization, "Bearer refreshed-token");
+    return Response.json({ id: "listener" });
+  };
+  await withServer(createApp({ env, fetchImpl }), async (server) => {
+    const agent = request.agent(server);
+    const login = await agent.get("/api/login").expect(302);
+    const state = new URL(login.headers.location).searchParams.get("state");
+    await agent.get("/api/logged").query({ code: "code", state }).expect(302);
+    await agent.get("/api/me").expect(200, { id: "listener" });
+  });
+  assert.equal(refreshCalls, 1);
+});
+
+test("an unexpectedly rejected access token is refreshed and retried once", async () => {
+  let profileCalls = 0;
+  let refreshCalls = 0;
+  const fetchImpl = async (url, options) => {
+    if (url === "https://accounts.spotify.com/api/token") {
+      if (options.body.get("grant_type") === "authorization_code") {
+        return Response.json({
+          access_token: "rejected-token",
+          refresh_token: "refresh-token",
+          token_type: "Bearer",
+          expires_in: 3600,
+        });
+      }
+      refreshCalls += 1;
+      return Response.json({
+        access_token: "replacement-token",
+        token_type: "Bearer",
+        expires_in: 3600,
+      });
+    }
+    profileCalls += 1;
+    if (profileCalls === 1) {
+      assert.equal(options.headers.Authorization, "Bearer rejected-token");
+      return Response.json({ error: "expired" }, { status: 401 });
+    }
+    assert.equal(options.headers.Authorization, "Bearer replacement-token");
+    return Response.json({ id: "listener" });
+  };
+  await withServer(createApp({ env, fetchImpl }), async (server) => {
+    const agent = request.agent(server);
+    const login = await agent.get("/api/login").expect(302);
+    const state = new URL(login.headers.location).searchParams.get("state");
+    await agent.get("/api/logged").query({ code: "code", state }).expect(302);
+    await agent.get("/api/me").expect(200, { id: "listener" });
+  });
+  assert.equal(profileCalls, 2);
+  assert.equal(refreshCalls, 1);
+});
+
+test("an invalid refresh token destroys the server session", async () => {
+  const sessions = new Map();
+  const fetchImpl = async (url, options) => {
+    if (url === "https://accounts.spotify.com/api/token") {
+      if (options.body.get("grant_type") === "authorization_code") {
+        return Response.json({
+          access_token: "expiring-token",
+          refresh_token: "invalid-refresh-token",
+          token_type: "Bearer",
+          expires_in: 30,
+        });
+      }
+      return Response.json({ error: "invalid_grant" }, { status: 400 });
+    }
+    throw new Error(`Unexpected request to ${url}`);
+  };
+  await withServer(createApp({ env, fetchImpl, sessions }), async (server) => {
+    const agent = request.agent(server);
+    const login = await agent.get("/api/login").expect(302);
+    const state = new URL(login.headers.location).searchParams.get("state");
+    await agent.get("/api/logged").query({ code: "code", state }).expect(302);
+    assert.equal(sessions.size, 1);
+    const response = await agent.get("/api/me").expect(401);
+    assert.deepEqual(response.body, { error: "Spotify authorization expired" });
+    assert.match(
+      response.headers["set-cookie"].join("\n"),
+      /spoticulum_session=;.*Max-Age=0/,
+    );
+    assert.equal(sessions.size, 0);
+  });
+});
+
 test("callbacks require matching state and consume it before calling Spotify", async () => {
   const app = createApp({
     env,

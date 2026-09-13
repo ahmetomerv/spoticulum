@@ -6,12 +6,13 @@ import { createAuthRoutes } from "./routes/authRoutes.js";
 export function createApp({
   env = process.env,
   fetchImpl = globalThis.fetch,
+  sessions,
   clientBuild = fileURLToPath(new URL("../../client/build/", import.meta.url)),
 } = {}) {
   const app = express();
   app.disable("x-powered-by");
   // Preserve the existing cross-origin API contract during this migration.
-  app.use("/api", cors(), createAuthRoutes({ env, fetchImpl }));
+  app.use("/api", cors(), createAuthRoutes({ env, fetchImpl, sessions }));
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
   // Unknown API paths must not receive the SPA HTML fallback.
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));

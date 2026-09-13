@@ -50,7 +50,7 @@ class CollectionCanvas extends React.Component {
 					this.setState({ mediaEntities }, () => this.createSpotifyCollection());
 				})
 				.catch(error => {
-					this.setState({ error });
+					this.handleApiError(error);
 				});
 		}
 
@@ -68,12 +68,20 @@ class CollectionCanvas extends React.Component {
 					return data;
 				})
 				.catch(error => {
-					this.setState({ error });
+					this.handleApiError(error);
 					return null;
 				})
 			.finally(() => {
 				this.setState({ isLoading: false });
 			});
+	}
+
+	handleApiError = (error) => {
+		if (error.status === 401) {
+			this.props.navigate('/?auth_error=session_expired', { replace: true });
+			return;
+		}
+		this.setState({ error });
 	}
 
 		getTop = (requestedType, offset, limit, timeRange) => {
