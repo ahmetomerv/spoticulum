@@ -100,8 +100,8 @@ class Home extends React.Component {
       loginUrl = 'http://localhost:8888/api/login';
     }
 
-    let profileUrl = 'default-profile-icon-16.jpg';
-    const exampleCollectionUrl = 'example-collection.png';
+    let profileUrl = 'default-profile-icon.jpeg';
+    const exampleCollectionUrl = 'example-collection.jpeg';
 
     if (user && user.images && user.images.length) {
       profileUrl = user.images[0].url;
@@ -184,7 +184,7 @@ class Home extends React.Component {
                       open={exampleModalOpen}
                     >
                       <ModalHeader>Example:</ModalHeader>
-                      <ModalContent image>
+                      <ModalContent image className='example-modal-content'>
                         <Image size='massive' src={exampleCollectionUrl} wrapped />
                       </ModalContent>
                       <ModalActions>

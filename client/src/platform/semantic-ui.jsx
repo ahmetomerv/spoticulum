@@ -245,7 +245,14 @@ export function ModalHeader({ children }) {
     </Dialog.Title>
   );
 }
-export function ModalContent({ image, children }) {
-  return <div className={classes(image && "image", "content")}>{children}</div>;
+export function ModalContent({ image, className, children, ...props }) {
+  return (
+    <div
+      {...props}
+      className={classes(image && "image", "content", className)}
+    >
+      {children}
+    </div>
+  );
 }
 export const ModalActions = element("div", "actions");

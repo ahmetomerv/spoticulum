@@ -4,12 +4,23 @@ body {
 }
 
 .top-container {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   height: 100vh;
-	background-image: url('/bg-1.png');
+}
+
+.top-container::before {
+	content: '';
+	position: absolute;
+	inset: -16px;
+	z-index: -1;
+	background-image: url('/example-collection.jpeg');
 	background-size: cover;
 	background-position: center;
+	filter: blur(1px);
+	clip-path: inset(16px);
 }
 
 .home-container {
@@ -78,6 +89,13 @@ body {
 
 .footer .icon:hover {
 	text-decoration: none;
+}
+
+.footer .x-icon {
+	width: 1em;
+	height: 1em;
+	vertical-align: -.1em;
+	fill: currentColor;
 }
 
 @media only screen and (max-width: 700px) {
@@ -229,4 +247,15 @@ body {
 
 .example-click:hover {
 	text-decoration: underline;
+}
+
+.ui.modal > .example-modal-content {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.ui.modal > .example-modal-content > .ui.image {
+	margin-right: auto;
+	margin-left: auto;
 }
