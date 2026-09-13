@@ -36,7 +36,7 @@ class Legal extends React.Component {
           <p>Last updated and effective: <time dateTime='2026-09-13'>13 September 2026</time></p>
 
           <p>
-            These Terms of Service govern your use of <a href='https://spoticulum.xyz'>Spoticulum</a>,
+            These Terms of Service govern your use of <a href='https://spoticulum.ahmeto.com'>Spoticulum</a>,
             a service operated by Ahmet Ömer that creates a downloadable image from your Spotify listening data.
             By selecting “Connect with Spotify” or otherwise using Spoticulum, you agree to these Terms and acknowledge
             the Privacy Policy below.

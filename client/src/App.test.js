@@ -32,6 +32,10 @@ test("preserves the login screen and legal navigation", async () => {
   expect(
     screen.getByText(/not affiliated with, authorized by, endorsed by/),
   ).toBeVisible();
+  expect(screen.getByRole("link", { name: "Spoticulum" })).toHaveAttribute(
+    "href",
+    "https://spoticulum.ahmeto.com",
+  );
   expect(screen.getAllByText("13 September 2026")).toHaveLength(2);
   expect(
     screen.getByText(/access-token response fields are temporarily included/),

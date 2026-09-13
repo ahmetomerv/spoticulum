@@ -326,7 +326,7 @@ class CollectionCanvas extends React.Component {
 
 			context.fillStyle = secondGradientColor;
 			context.font = 'bold 15px sans-serif';
-			context.fillText('spoticulum.xyz', 110 + padding, height - 42);
+			context.fillText('spoticulum.ahmeto.com', 110 + padding, height - 42);
 
 			context.fillStyle = firstGradientColor;
 			context.font = 'bold 15px sans-serif';
