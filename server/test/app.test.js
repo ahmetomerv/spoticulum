@@ -10,9 +10,35 @@ import { createApp } from "../src/createApp.js";
 const env = {
   CLIENT_ID: "test-client",
   CLIENT_SECRET: "test-secret",
+  SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
   REDIRECTURI: "http://127.0.0.1:8888/api/logged",
   CLIENT_REDIRECTURI: "http://127.0.0.1:3000/",
 };
+const productionEnv = {
+  ...env,
+  NODE_ENV: "production",
+  REDIRECTURI: "https://spoticulum.ahmeto.com/api/logged",
+  CLIENT_REDIRECTURI: "https://spoticulum.ahmeto.com",
+};
+
+test("production requires complete secure OAuth configuration", () => {
+  assert.throws(
+    () => createApp({ env: { NODE_ENV: "production" } }),
+    /Missing required production environment variables/,
+  );
+  assert.throws(
+    () =>
+      createApp({
+        env: {
+          ...env,
+          NODE_ENV: "production",
+          REDIRECTURI: "http://spoticulum.ahmeto.com/api/logged",
+          CLIENT_REDIRECTURI: "https://spoticulum.ahmeto.com",
+        },
+      }),
+    /must use HTTPS/,
+  );
+});
 
 async function withServer(app, callback) {
   const server = createServer(app);
@@ -42,7 +68,7 @@ test("authorization redirect preserves the Spotify scopes and callback", async (
 
 test("production OAuth state cookies are secure", async () => {
   const response = await withServer(
-    createApp({ env: { ...env, NODE_ENV: "production" } }),
+    createApp({ env: productionEnv }),
     (server) => request(server).get("/api/login").expect(302),
   );
   assert.match(response.headers["set-cookie"][0], /; Secure/);
@@ -198,6 +224,31 @@ test("an invalid refresh token destroys the server session", async () => {
       response.headers["set-cookie"].join("\n"),
       /spoticulum_session=;.*Max-Age=0/,
     );
+    assert.equal(sessions.size, 0);
+  });
+});
+
+test("expired sessions are removed server-side", async () => {
+  const sessions = new Map();
+  const fetchImpl = async (url) => {
+    if (url === "https://accounts.spotify.com/api/token") {
+      return Response.json({
+        access_token: "access-token",
+        refresh_token: "refresh-token",
+        token_type: "Bearer",
+        expires_in: 3600,
+      });
+    }
+    throw new Error(`Unexpected request to ${url}`);
+  };
+  await withServer(createApp({ env, fetchImpl, sessions }), async (server) => {
+    const agent = request.agent(server);
+    const login = await agent.get("/api/login").expect(302);
+    const state = new URL(login.headers.location).searchParams.get("state");
+    await agent.get("/api/logged").query({ code: "code", state }).expect(302);
+    const session = sessions.values().next().value;
+    session.sessionExpiresAt = Date.now() - 1;
+    await agent.get("/api/me").expect(401, { error: "Not authenticated" });
     assert.equal(sessions.size, 0);
   });
 });
@@ -383,7 +434,7 @@ test("production serves assets and every SPA route independently of cwd, with AP
     );
     await writeFile(join(dir, "asset.js"), 'console.log("asset")');
     const app = createApp({
-      env: { ...env, NODE_ENV: "production" },
+      env: productionEnv,
       clientBuild: dir,
     });
     await withServer(app, async (server) => {

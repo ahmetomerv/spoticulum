@@ -19,7 +19,15 @@ export default defineConfig({
   webServer: [
     {
       command: "node ../server/app.js",
-      env: { NODE_ENV: "production", PORT: "3101" },
+      env: {
+        NODE_ENV: "production",
+        PORT: "3101",
+        CLIENT_ID: "playwright-client",
+        CLIENT_SECRET: "playwright-client-secret",
+        SESSION_SECRET: "playwright-session-secret-with-at-least-32-characters",
+        REDIRECTURI: "https://spoticulum.ahmeto.com/api/logged",
+        CLIENT_REDIRECTURI: "https://spoticulum.ahmeto.com",
+      },
       url: "http://127.0.0.1:3101/health",
     },
     {

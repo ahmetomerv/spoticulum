@@ -91,11 +91,45 @@ function tokenExpiresAt(data) {
   return Date.now() + lifetime * 1000;
 }
 
+function validateProductionEnvironment(env) {
+  if (env.NODE_ENV !== "production") return;
+  const required = [
+    "CLIENT_ID",
+    "CLIENT_SECRET",
+    "SESSION_SECRET",
+    "REDIRECTURI",
+    "CLIENT_REDIRECTURI",
+  ];
+  const missing = required.filter((name) => !env[name]);
+  if (missing.length) {
+    throw new Error(
+      `Missing required production environment variables: ${missing.join(", ")}`,
+    );
+  }
+  if (env.SESSION_SECRET.length < 32) {
+    throw new Error(
+      "SESSION_SECRET must be at least 32 characters in production",
+    );
+  }
+  const redirectUri = new URL(env.REDIRECTURI);
+  const clientRedirectUri = new URL(env.CLIENT_REDIRECTURI);
+  if (
+    redirectUri.protocol !== "https:" ||
+    clientRedirectUri.protocol !== "https:"
+  ) {
+    throw new Error("Production redirect URLs must use HTTPS");
+  }
+  if (redirectUri.origin !== clientRedirectUri.origin) {
+    throw new Error("Production redirect URLs must use the same origin");
+  }
+}
+
 export function createAuthRoutes({
   env = process.env,
   fetchImpl = globalThis.fetch,
   sessions = new Map(),
 } = {}) {
+  validateProductionEnvironment(env);
   const router = express.Router();
   const cookieSecret =
     env.SESSION_SECRET ||
@@ -139,14 +173,27 @@ export function createAuthRoutes({
 
   const createSession = (tokenData) => {
     const sessionId = crypto.randomBytes(32).toString("base64url");
-    sessions.set(sessionId, {
+    const session = {
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token,
       tokenType: tokenData.token_type || "Bearer",
       scope: tokenData.scope || "",
       expiresAt: tokenExpiresAt(tokenData),
-    });
+      sessionExpiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
+    };
+    session.expiryTimer = setTimeout(
+      () => sessions.delete(sessionId),
+      SESSION_MAX_AGE_SECONDS * 1000,
+    );
+    session.expiryTimer.unref?.();
+    sessions.set(sessionId, session);
     return sessionId;
+  };
+
+  const deleteSession = (sessionId) => {
+    const session = sessions.get(sessionId);
+    if (session?.expiryTimer) clearTimeout(session.expiryTimer);
+    sessions.delete(sessionId);
   };
 
   const setSignedCookie = (res, name, value, maxAge) => {
@@ -175,6 +222,10 @@ export function createAuthRoutes({
     if (!sessionId) return null;
     const session = sessions.get(sessionId);
     if (!session) return null;
+    if (session.sessionExpiresAt <= Date.now()) {
+      deleteSession(sessionId);
+      return null;
+    }
     return { sessionId, session };
   };
 
@@ -269,7 +320,7 @@ export function createAuthRoutes({
   const sendSpotifyError = (res, error, stored) => {
     const status = error.status || 502;
     if (status === 401) {
-      if (stored) sessions.delete(stored.sessionId);
+      if (stored) deleteSession(stored.sessionId);
       clearAuthCookies(res);
       return res.status(401).json({ error: "Spotify authorization expired" });
     }
@@ -393,7 +444,7 @@ export function createAuthRoutes({
 
   router.post("/logout", (req, res) => {
     const sessionId = readSignedCookie(req, SESSION_COOKIE);
-    if (sessionId) sessions.delete(sessionId);
+    if (sessionId) deleteSession(sessionId);
     clearAuthCookies(res);
     res.set("Cache-Control", "no-store");
     res.status(204).end();

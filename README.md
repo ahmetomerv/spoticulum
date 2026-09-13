@@ -97,3 +97,15 @@ An optional multi-stage Dockerfile installs only server production dependencies
 in the final image. Build with `docker build -t spoticulum .`, then run it with
 your environment supplied at runtime. Build-time analytics can be supplied with
 `--build-arg VITE_GA=...`. No deployment is performed by this repository's CI.
+
+For Coolify, deploy the repository with the Dockerfile build pack, repository
+root as the base directory, `/Dockerfile` as the Dockerfile location, and `8888`
+as the exposed internal port. Set the domain to
+`https://spoticulum.ahmeto.com`. Configure `CLIENT_ID`, `CLIENT_SECRET`,
+`SESSION_SECRET`, `REDIRECTURI`, and `CLIENT_REDIRECTURI` as runtime variables;
+only `VITE_GA`, when used, is a build variable. The image-provided `/health`
+check takes precedence over a Coolify-managed health check.
+
+Sessions currently live in one container's memory. Run one replica; deployments
+and restarts sign users out. Use a shared session store before enabling multiple
+replicas or requiring sessions to survive deployments.

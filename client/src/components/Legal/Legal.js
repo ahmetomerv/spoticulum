@@ -153,8 +153,9 @@ class Legal extends React.Component {
             </li>
             <li>
               <strong>Spotify profile and listening data:</strong> The browser requests your display name, profile image
-              and profile link, top artists or tracks, related album information, and artwork. Spoticulum requests only the
-              <code>user-top-read</code> scope. Spotify receives your requests and applies its own privacy policy.
+              and profile link, top artists or tracks, related album information, and artwork from the Spoticulum server.
+              The server retrieves that data from Spotify using only the <code>user-top-read</code> scope. Spotify receives
+              those requests and applies its own privacy policy.
             </li>
             <li>
               <strong>Generated collection:</strong> The collection is assembled in your browser. The image is downloaded
@@ -171,14 +172,14 @@ class Legal extends React.Component {
             service (Article 6(1)(f) GDPR).
           </p>
 
-          <h2>OAuth tokens and browser URLs</h2>
+          <h2>OAuth tokens and sessions</h2>
           <p>
-            Spoticulum does not maintain an account database. After Spotify authorization, access-token response fields
-            are temporarily included in the callback URL and read by the browser so it can call Spotify directly. Those
-            values can remain in browser history and may appear in hosting or proxy logs. Do not share the callback URL.
-            Select “Log out” when finished, avoid using the service on a shared device, and revoke access from Spotify’s
-            <ExternalLink href='https://www.spotify.com/account/apps/'>Apps page</ExternalLink> if needed. The application
-            does not intentionally persist Spotify tokens or listening data in its own database.
+            Spoticulum does not maintain an account database. The server exchanges Spotify’s short-lived authorization
+            code and keeps the resulting access and refresh tokens in volatile server memory. Tokens are not placed in
+            browser URLs or browser-readable storage. Your browser receives a signed, HTTP-only session cookie that expires
+            after no more than seven days. The server session is also removed after seven days, when you log out, when
+            Spotify authorization can no longer be refreshed, or when the server restarts. You can revoke access at any
+            time from Spotify’s <ExternalLink href='https://www.spotify.com/account/apps/'>Apps page</ExternalLink>.
           </p>
 
           <h2>Optional Google Analytics</h2>
@@ -227,11 +228,11 @@ class Legal extends React.Component {
 
           <h2>Retention</h2>
           <p>
-            Spoticulum keeps no database of Spotify profiles, listening histories, or generated collections. OAuth and
-            Spotify data are processed for the active request and browser session. Browser history remains under your
-            control. Technical logs are retained only for the period needed for security, troubleshooting, and hosting
-            operations, then deleted or anonymized. Analytics retention is described above. Legal records may be retained
-            where required by law.
+            Spoticulum keeps no database of Spotify profiles, listening histories, or generated collections. OAuth tokens
+            are retained in volatile server memory for no more than seven days and Spotify data is processed for the active
+            request and browser session. Technical logs are retained only for the period needed for security,
+            troubleshooting, and hosting operations, then deleted or anonymized. Analytics retention is described above.
+            Legal records may be retained where required by law.
           </p>
 
           <h2>Your rights</h2>
@@ -253,8 +254,8 @@ class Legal extends React.Component {
           <h2>Security</h2>
           <p>
             We use reasonable technical and organizational safeguards, including keeping the Spotify client secret out of
-            the browser, short-lived access tokens, and data minimization. Production deployments are intended to use
-            HTTPS. No internet transmission or storage method is completely secure.
+            the browser, signed HTTP-only cookies, short-lived access tokens, HTTPS in production, and data minimization.
+            No internet transmission or storage method is completely secure.
           </p>
 
           <h2>Changes and contact</h2>
