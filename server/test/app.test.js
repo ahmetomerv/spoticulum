@@ -202,6 +202,77 @@ test("an invalid refresh token destroys the server session", async () => {
   });
 });
 
+test("Spotify permission, quota, and rate-limit errors are actionable", async () => {
+  const cases = [
+    {
+      status: 403,
+      spotifyBody: { error: { status: 403, message: "Forbidden" } },
+      expectedBody: {
+        error:
+          "Spotify refused this request. If the app is in development mode, make sure this Spotify account is allowlisted.",
+      },
+    },
+    {
+      status: 429,
+      spotifyBody: {
+        error: {
+          status: 429,
+          message: "Too many requests",
+          reason: "QUOTA_EXCEEDED",
+        },
+      },
+      retryAfter: "60",
+      expectedBody: {
+        error:
+          "Spotify's development quota has been exceeded. Try again later or contact the app owner.",
+        retryAfter: "60",
+        reason: "QUOTA_EXCEEDED",
+      },
+    },
+    {
+      status: 429,
+      spotifyBody: { error: { status: 429, message: "Too many requests" } },
+      retryAfter: "12",
+      expectedBody: {
+        error: "Spotify rate limit reached. Try again in 12 seconds.",
+        retryAfter: "12",
+      },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const fetchImpl = async (url) => {
+      if (url === "https://accounts.spotify.com/api/token") {
+        return Response.json({
+          access_token: "access-token",
+          refresh_token: "refresh-token",
+          token_type: "Bearer",
+          expires_in: 3600,
+        });
+      }
+      return Response.json(testCase.spotifyBody, {
+        status: testCase.status,
+        headers: testCase.retryAfter
+          ? { "Retry-After": testCase.retryAfter }
+          : undefined,
+      });
+    };
+    await withServer(createApp({ env, fetchImpl }), async (server) => {
+      const agent = request.agent(server);
+      const login = await agent.get("/api/login").expect(302);
+      const state = new URL(login.headers.location).searchParams.get("state");
+      await agent.get("/api/logged").query({ code: "code", state }).expect(302);
+      const response = await agent
+        .get("/api/top/artists")
+        .expect(testCase.status);
+      assert.deepEqual(response.body, testCase.expectedBody);
+      if (testCase.retryAfter) {
+        assert.equal(response.headers["retry-after"], testCase.retryAfter);
+      }
+    });
+  }
+});
+
 test("callbacks require matching state and consume it before calling Spotify", async () => {
   const app = createApp({
     env,

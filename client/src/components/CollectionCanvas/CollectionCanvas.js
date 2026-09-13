@@ -23,9 +23,15 @@ class CollectionCanvas extends React.Component {
 	componentDidMount() {
 		const params = new URLSearchParams(window.location.search);
 		const collectionRequestType = params.get('collection_request_type');
-		this.setState({ collectionRequestType }, async () => {
-			const user = await this.getAuthenticatedUser();
-			if (!this.state.error && user) {
+		const user = this.props.location?.state?.user;
+		this.setState({ collectionRequestType, user: user || null }, async () => {
+			if (user) {
+				if (user.display_name) updateDocumentTitle(user.display_name);
+				this.initializeCollectionData();
+				return;
+			}
+			const authenticatedUser = await this.getAuthenticatedUser();
+			if (!this.state.error && authenticatedUser) {
 				this.initializeCollectionData();
 			}
 		});

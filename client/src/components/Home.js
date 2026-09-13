@@ -25,6 +25,7 @@ class Home extends React.Component {
   }
 
 	  state = {
+			authError: null,
 			error: null,
 			user: null,
 			isLoading: false,
@@ -37,8 +38,10 @@ class Home extends React.Component {
 			if (authError) {
 				const message = authError === 'session_expired'
 					? 'Your Spotify session expired. Connect again to continue.'
-					: 'Spotify authorization was cancelled or failed.';
-				this.setState({ error: new Error(message) });
+					: authError === 'access_denied'
+						? 'Spotify authorization was cancelled. You can connect whenever you are ready.'
+						: 'Spotify authorization failed. Please try connecting again.';
+				this.setState({ authError, error: new Error(message) });
 				window.history.replaceState({}, '', '/');
 				return;
 			}
@@ -81,7 +84,9 @@ class Home extends React.Component {
   handleTypeChange = (value) => (e) => {
     const queryParams = new URLSearchParams(window.location.search);
     queryParams.append('collection_request_type', value);
-    this.props.navigate('/collection?' + queryParams.toString());
+		this.props.navigate('/collection?' + queryParams.toString(), {
+			state: { user: this.state.user },
+		});
 	}
 
 	  handleModal(boolean) {
@@ -89,7 +94,7 @@ class Home extends React.Component {
   }
 
   render() {
-		const { isLoading, user, exampleModalOpen } = this.state;
+		const { authError, isLoading, user, exampleModalOpen } = this.state;
 
 	    let loginUrl = '/api/login';
 
@@ -112,7 +117,7 @@ class Home extends React.Component {
 	          </div>
 	          <div>
 						<a className="button primary-button" href="/api/login">
-							Reconnect with Spotify
+							{authError === 'access_denied' ? 'Connect with Spotify' : 'Reconnect with Spotify'}
 						</a>
 	          </div>
         </div>

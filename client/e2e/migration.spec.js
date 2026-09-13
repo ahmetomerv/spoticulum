@@ -78,7 +78,9 @@ for (const type of ["artists", "tracks"]) {
     const image =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luzk6QAAAABJRU5ErkJggg==";
     let authenticated = true;
+    let profileCalls = 0;
     await page.route("**/api/me", async (route) => {
+      profileCalls += 1;
       if (!authenticated) {
         await route.fulfill({
           status: 401,
@@ -133,6 +135,7 @@ for (const type of ["artists", "tracks"]) {
       page.getByRole("button", { name: "Download Collection" }),
     ).toBeVisible({ timeout: 20000 });
     await expect(page.locator("#canvas canvas")).toHaveCount(1);
+    expect(profileCalls).toBe(1);
     expect(
       await page
         .locator("canvas")
@@ -195,4 +198,46 @@ test("an expired collection session offers an immediate Spotify reconnect", asyn
   await expect(
     page.getByRole("link", { name: "Reconnect with Spotify" }),
   ).toHaveAttribute("href", "/api/login");
+});
+
+test("denied Spotify authorization returns a clean cancellation message", async ({
+  page,
+}) => {
+  await page.goto("/?auth_error=access_denied");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(
+    page.getByText(
+      "Spotify authorization was cancelled. You can connect whenever you are ready.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Connect with Spotify" }),
+  ).toHaveAttribute("href", "/api/login");
+});
+
+test("a Spotify rate limit is shown instead of treating the response as collection data", async ({
+  page,
+}) => {
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      json: { id: "listener", display_name: "Test Listener", images: [] },
+    }),
+  );
+  await page.route("**/api/top/**", (route) =>
+    route.fulfill({
+      status: 429,
+      headers: { "Retry-After": "12" },
+      json: {
+        error: "Spotify rate limit reached. Try again in 12 seconds.",
+        retryAfter: "12",
+      },
+    }),
+  );
+  await page.goto("/collection?collection_request_type=artists");
+  await expect(
+    page.getByText("Spotify rate limit reached. Try again in 12 seconds."),
+  ).toBeVisible();
+  expect(pageErrors).toEqual([]);
 });

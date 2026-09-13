@@ -280,10 +280,17 @@ export function createAuthRoutes({
       });
     }
     if (status === 429) {
+      const reason = error.spotifyError?.error?.reason;
+      if (error.retryAfter) res.set("Retry-After", error.retryAfter);
       return res.status(429).json({
-        error: "Spotify rate limit reached",
+        error:
+          reason === "QUOTA_EXCEEDED"
+            ? "Spotify's development quota has been exceeded. Try again later or contact the app owner."
+            : error.retryAfter
+              ? `Spotify rate limit reached. Try again in ${error.retryAfter} seconds.`
+              : "Spotify rate limit reached. Try again shortly.",
         retryAfter: error.retryAfter,
-        reason: error.spotifyError?.error?.reason,
+        reason,
       });
     }
     return res.status(status >= 400 && status < 500 ? status : 502).json({
