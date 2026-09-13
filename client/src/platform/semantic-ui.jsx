@@ -247,10 +247,7 @@ export function ModalHeader({ children }) {
 }
 export function ModalContent({ image, className, children, ...props }) {
   return (
-    <div
-      {...props}
-      className={classes(image && "image", "content", className)}
-    >
+    <div {...props} className={classes(image && "image", "content", className)}>
       {children}
     </div>
   );

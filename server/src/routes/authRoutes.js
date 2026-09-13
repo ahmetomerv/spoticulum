@@ -18,7 +18,7 @@ export function createAuthRoutes({
     const query = new URLSearchParams({
       response_type: "code",
       client_id: env.CLIENT_ID,
-      scope: "user-library-read user-top-read playlist-read-private",
+      scope: "user-top-read",
       redirect_uri: env.REDIRECTURI,
     });
     res.redirect(`https://accounts.spotify.com/authorize?${query}`);

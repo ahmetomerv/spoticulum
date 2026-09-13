@@ -18,19 +18,19 @@ class Footer extends React.Component {
   }
 
   state = {
-    footerPopoverContent: 'Click to copy: hi@ahmeto.com',
+    footerPopoverContent: 'Click to copy: spoticulum@ahmeto.com',
     footerPopoverIsOpen: false,
   }
 
   handleFooterEmailClick = () => {
-    navigator.clipboard.writeText('hi@ahmeto.com')
+    navigator.clipboard.writeText('spoticulum@ahmeto.com')
       .then(() => {
         this.setState({
           footerPopoverContent: 'Copied!',
         })
         setTimeout(() => {
           this.setState({
-            footerPopoverContent: 'Click to copy: hi@ahmeto.com',
+            footerPopoverContent: 'Click to copy: spoticulum@ahmeto.com',
             footerPopoverIsOpen: false,
           });
         }, 2000);
@@ -72,7 +72,15 @@ class Footer extends React.Component {
                   <Divider className='footer-divider'  />
                   <div>
                     <Link className='legal-link' to='/legal'>Terms of Service & Privacy Policy</Link>
+                    {this.props.analyticsAvailable &&
+                      <button className='privacy-settings-link' type='button' onClick={this.props.onOpenPrivacySettings}>
+                        Privacy settings
+                      </button>
+                    }
                   </div>
+                  <p className='spotify-disclaimer'>
+                    Spoticulum is independent and is not affiliated with Spotify AB. Spotify is a trademark of Spotify AB; copyrighted content belongs to its respective owners.
+                  </p>
                 </div>
               </Grid.Column>
             </Grid.Row>

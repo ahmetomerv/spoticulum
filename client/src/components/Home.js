@@ -174,10 +174,11 @@ class Home extends React.Component {
                       Create your personalized Spotify <Popup content='Click to see example collection' trigger={ <span className='example-click' onClick={() => this.handleModal(true)}>collection
                       </span> }/> snapshot based on what you listen to the most.
                     </div>
-                    <a className="button primary-button" href={loginUrl}>Login with Spotify</a>
-                    <br/>
-                    <br/>
-                    <p>Authentication is handled by Spotify.</p>
+                    <a className="button primary-button" href={loginUrl}>Connect with Spotify</a>
+                    <Divider className='footer-divider'  />
+                    <p className='login-legal-notice'>
+                      By continuing, you agree to the <a href='/legal#terms-of-service'>Terms of Service</a> and acknowledge the <a href='/legal#privacy-policy'>Privacy Policy</a>.
+                    </p>
                     <Modal
                       onClose={() => this.handleModal(false)}
                       onOpen={() => this.handleModal(true)}

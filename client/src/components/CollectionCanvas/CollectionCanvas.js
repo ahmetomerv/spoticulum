@@ -4,7 +4,7 @@ import { createHiDPICanvas, initializeCanvasGradient, drawCell, downloadCanvasIm
 import { updateDocumentTitle, getHashParams, getRandomColor } from '../../helpers/utils';
 import mediaEntityMapper from '../../helpers/mediaEntityMapper';
 import { withRouter } from '../../withRouter';
-import ReactGA from "react-ga4";
+import { trackAnalyticsEvent } from '../../platform/analytics';
 import { Button, Header, Segment } from 'semantic-ui-react'
 
 class CollectionCanvas extends React.Component {
@@ -142,7 +142,7 @@ class CollectionCanvas extends React.Component {
 	handleDownloadCollectionClick = () => {
 		if (this.state.canvas) {
 			downloadCanvasImage(this.state.canvas, this.state.user.display_name);
-			ReactGA.event({
+			trackAnalyticsEvent({
 				category: 'main',
 				action: 'download',
 				label: 'User has downloaded a profile collection',

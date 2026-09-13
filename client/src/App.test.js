@@ -12,14 +12,22 @@ test("preserves the login screen and legal navigation", async () => {
     </MemoryRouter>,
   );
   expect(
-    screen.getByRole("link", { name: "Login with Spotify" }),
+    screen.getByRole("link", { name: "Connect with Spotify" }),
   ).toBeVisible();
+  expect(screen.getByText(/Spotify is a trademark of Spotify AB/)).toBeVisible();
   await user.click(
     screen.getByRole("link", { name: "Terms of Service & Privacy Policy" }),
   );
   expect(
-    screen.getByText(/Spoticulum is an independent service/),
+    screen.getByText(/not affiliated with, authorized by, endorsed by/),
   ).toBeVisible();
+  expect(screen.getAllByText("13 September 2026")).toHaveLength(2);
+  expect(
+    screen.getByText(/access-token response fields are temporarily included/),
+  ).toBeVisible();
+  expect(screen.getAllByRole("link", { name: "spoticulum@ahmeto.com" })).toHaveLength(
+    4,
+  );
 });
 
 test("preserves the example modal and its close action", async () => {
@@ -32,5 +40,7 @@ test("preserves the example modal and its close action", async () => {
   await user.click(screen.getByText("collection", { exact: true }));
   expect(screen.getByRole("dialog", { name: "Example:" })).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Ok" }));
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("dialog", { name: "Example:" }),
+  ).not.toBeInTheDocument();
 });

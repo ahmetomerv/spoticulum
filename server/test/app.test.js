@@ -21,10 +21,7 @@ test("authorization redirect preserves the Spotify scopes and callback", async (
   assert.equal(url.origin, "https://accounts.spotify.com");
   assert.equal(url.searchParams.get("client_id"), env.CLIENT_ID);
   assert.equal(url.searchParams.get("redirect_uri"), env.REDIRECTURI);
-  assert.equal(
-    url.searchParams.get("scope"),
-    "user-library-read user-top-read playlist-read-private",
-  );
+  assert.equal(url.searchParams.get("scope"), "user-top-read");
 });
 
 test("native fetch exchanges the code and preserves the existing client callback fields", async () => {

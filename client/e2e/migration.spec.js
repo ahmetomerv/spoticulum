@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("spoticulum.analytics-consent", "denied");
+  });
   await page.route(
     /google-analytics\.com|googletagmanager\.com|fonts\.googleapis\.com/,
     (route) => {

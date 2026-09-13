@@ -35,9 +35,11 @@ retain their original login URLs: `http://localhost:8888/api/login` in
 development and `https://spoticulum.xyz/api/login` in production.
 
 The public analytics setting accepts `VITE_GA` or the original `REACT_APP_GA`.
-Only this setting is exposed by the Vite compatibility configuration. Environment
-variables are embedded at build time, as they were with CRA. Leave it empty to
-disable analytics during local testing.
+Only this setting is exposed by the Vite compatibility configuration. Analytics
+loads only after explicit consent, can be disabled again from the footer, and
+does not receive Spotify profile or listening data. Environment variables are
+embedded at build time, as they were with CRA. Leave the setting empty to omit
+analytics entirely.
 
 ## Verification
 

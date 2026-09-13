@@ -6,6 +6,7 @@ body {
 .top-container {
   position: relative;
   isolation: isolate;
+  overflow-x: clip;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -56,16 +57,51 @@ body {
 
 .legal-container {
 	background: #fff;
-	padding: 6em 33em;
+	padding: 5em max(2em, calc((100vw - 900px) / 2));
+	line-height: 1.65;
 }
 
 .legal-container p {
 	font-size: 1.1em;
 }
 
+.legal-container section {
+	max-width: 900px;
+	margin: 0 auto;
+	scroll-margin-top: 8em;
+}
+
+.legal-container section + section {
+	margin-top: 5em;
+	padding-top: 5em;
+	border-top: 1px solid #ddd;
+}
+
+.legal-container h2 {
+	margin-top: 2em;
+}
+
+.legal-container li {
+	margin-bottom: .65em;
+}
+
+.legal-container code {
+	padding: .1em .3em;
+	border-radius: 3px;
+	background: #f3f3f3;
+}
+
 .footer .legal-link {
 	margin: 0 .3em;
 	font-size: .6em;
+}
+
+.spotify-disclaimer {
+	max-width: 46rem;
+	margin: 1.5em auto 0;
+	color: rgba(255, 255, 255, .78);
+	font-size: .55em;
+	line-height: 1.45;
 }
 
 .container {
@@ -96,6 +132,63 @@ body {
 	height: 1em;
 	vertical-align: -.1em;
 	fill: currentColor;
+}
+
+.privacy-settings-link {
+	margin: 0 .3em;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #fff;
+	font: inherit;
+	font-size: .6em;
+	cursor: pointer;
+}
+
+.privacy-settings-link:hover {
+	color: #58dea0;
+	text-decoration: underline;
+}
+
+.analytics-consent {
+	position: fixed;
+	right: 1.5em;
+	bottom: 1.5em;
+	left: 1.5em;
+	z-index: 3000;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 2em;
+	max-width: 900px;
+	margin: 0 auto;
+	padding: 1.25em 1.5em;
+	border: 1px solid #ccc;
+	border-radius: 6px;
+	background: #fff;
+	box-shadow: 0 8px 30px rgb(0 0 0 / 25%);
+}
+
+.analytics-consent p {
+	margin: .35em 0 0;
+}
+
+.analytics-consent-actions {
+	display: flex;
+	gap: .75em;
+	white-space: nowrap;
+}
+
+.analytics-consent-actions button {
+	padding: .65em 1em;
+	border: 1px solid #bbb;
+	border-radius: 3px;
+	cursor: pointer;
+}
+
+.login-legal-notice {
+	max-width: 36em;
+	font-size: .85em;
 }
 
 @media only screen and (max-width: 700px) {
@@ -136,6 +229,16 @@ body {
 
 	.legal-container {
 		padding: 3em 2em;
+	}
+
+	.analytics-consent {
+		align-items: stretch;
+		flex-direction: column;
+		gap: 1em;
+	}
+
+	.analytics-consent-actions {
+		justify-content: flex-end;
 	}
 }
 
