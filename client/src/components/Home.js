@@ -166,8 +166,8 @@ class Home extends React.Component {
                   </Form>
                 : <React.Fragment>
                     <div className="login-info">
-                      Create your personalized Spotify <Popup content='Click to see example collection' trigger={ <span className='example-click' onClick={() => this.handleModal(true)}>collection
-                      </span> }/> snapshot based on what you listen to the most.
+                      Create a <Popup content='Click to see example collection' trigger={ <span className='example-click' onClick={() => this.handleModal(true)}>visual snapshot
+                      </span> }/> of your most-listened-to artists and albums.
                     </div>
                     <a className="button primary-button" href={loginUrl}>Connect with Spotify</a>
                     <Divider className='footer-divider'  />

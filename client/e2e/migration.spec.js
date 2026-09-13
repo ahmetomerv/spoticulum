@@ -37,16 +37,16 @@ test("home, popup, example modal, Escape, and legal deep link", async ({
   await expect(
     page.getByRole("link", { name: "Connect with Spotify" }),
   ).toBeVisible();
-  await page.getByText("collection", { exact: true }).hover();
+  await page.getByText("visual snapshot", { exact: true }).hover();
   await expect(page.getByRole("tooltip")).toContainText(
     "Click to see example collection",
   );
-  await page.getByText("collection", { exact: true }).click();
+  await page.getByText("visual snapshot", { exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Example:" })).toBeVisible();
   await expect(page.locator('[role="dialog"] img')).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByText("collection", { exact: true }).click();
+  await page.getByText("visual snapshot", { exact: true }).click();
   await page.getByRole("button", { name: "Ok", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page
@@ -172,7 +172,7 @@ test("mobile home retains its layout and modal controls", async ({ page }) => {
   await expect(
     page.getByRole("link", { name: "Connect with Spotify" }),
   ).toBeVisible();
-  await page.getByText("collection", { exact: true }).click();
+  await page.getByText("visual snapshot", { exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("button", { name: "Ok", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);

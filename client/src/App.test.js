@@ -48,7 +48,7 @@ test("preserves the example modal and its close action", async () => {
       <App />
     </MemoryRouter>,
   );
-  await user.click(await screen.findByText("collection", { exact: true }));
+  await user.click(await screen.findByText("visual snapshot", { exact: true }));
   expect(screen.getByRole("dialog", { name: "Example:" })).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Ok" }));
   expect(
