@@ -26,11 +26,16 @@ test("home, popup, example modal, Escape, and legal deep link", async ({
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
+    if (
+      message.type() === "error" &&
+      !message.text().includes("401 (Unauthorized)")
+    ) {
+      errors.push(message.text());
+    }
   });
   await page.goto("/");
   await expect(
-    page.getByRole("link", { name: "Login with Spotify" }),
+    page.getByRole("link", { name: "Connect with Spotify" }),
   ).toBeVisible();
   await page.getByText("collection", { exact: true }).hover();
   await expect(page.getByRole("tooltip")).toContainText(
@@ -58,55 +63,63 @@ test("home, popup, example modal, Escape, and legal deep link", async ({
 for (const type of ["artists", "tracks"]) {
   test(`Spotify ${type} collection, PNG download and back navigation`, async ({
     page,
-    baseURL,
   }) => {
     const errors = [];
     const offsets = [];
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("console", (message) => {
-      if (message.type() === "error") errors.push(message.text());
-    });
-    const image = `${baseURL}/spoticulum-logo.png`;
-    await page.route("https://api.spotify.com/v1/**", async (route) => {
-      expect(route.request().headers().authorization).toBe(
-        "Bearer fixture-access",
-      );
-      const url = new URL(route.request().url());
-      if (url.pathname === "/v1/me") {
-        await route.fulfill({
-          json: {
-            id: "listener",
-            display_name: "Test Listener",
-            images: [{ url: image }],
-            external_urls: {
-              spotify: "https://open.spotify.com/user/listener",
-            },
-          },
-        });
-      } else {
-        const offset = Number(url.searchParams.get("offset") || 0);
-        offsets.push(offset);
-        const items = Array.from({ length: 20 }, (_, index) => ({
-          id: `${type}-${offset + index}`,
-          ...(type === "artists"
-            ? { images: [{ url: image }] }
-            : { album: { images: [{ url: image }] } }),
-        }));
-        await route.fulfill({
-          json: {
-            items,
-            offset,
-            next:
-              offset < 80
-                ? `https://api.spotify.com/v1/me/top/${type}?offset=${offset + 20}`
-                : null,
-          },
-        });
+      if (
+        message.type() === "error" &&
+        !message.text().includes("401 (Unauthorized)")
+      ) {
+        errors.push(message.text());
       }
     });
-    await page.goto(
-      "/?access_token=fixture-access&refresh_token=fixture-refresh&token_type=Bearer&expires_in=3600",
-    );
+    const image =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luzk6QAAAABJRU5ErkJggg==";
+    let authenticated = true;
+    await page.route("**/api/me", async (route) => {
+      if (!authenticated) {
+        await route.fulfill({
+          status: 401,
+          json: { error: "Not authenticated" },
+        });
+        return;
+      }
+      await route.fulfill({
+        json: {
+          id: "listener",
+          display_name: "Test Listener",
+          images: [{ url: image }],
+          external_urls: {
+            spotify: "https://open.spotify.com/user/listener",
+          },
+        },
+      });
+    });
+    await page.route("**/api/top/**", async (route) => {
+      const url = new URL(route.request().url());
+      const offset = Number(url.searchParams.get("offset") || 0);
+      offsets.push(offset);
+      const items = Array.from({ length: 50 }, (_, index) => ({
+        id: `${type}-${offset + index}`,
+        ...(type === "artists"
+          ? { images: [{ url: image }] }
+          : { album: { images: [{ url: image }] } }),
+      }));
+      await route.fulfill({
+        json: {
+          items,
+          offset,
+          next: offset < 50 ? `/api/top/${type}?offset=${offset + 50}` : null,
+        },
+      });
+    });
+    await page.route("**/api/logout", async (route) => {
+      authenticated = false;
+      await route.fulfill({ status: 204, body: "" });
+    });
+    await page.goto("/");
     await expect(
       page.getByText("Test Listener", { exact: true }),
     ).toBeVisible();
@@ -125,7 +138,7 @@ for (const type of ["artists", "tracks"]) {
         .locator("canvas")
         .evaluate((canvas) => ({ width: canvas.width, height: canvas.height })),
     ).toEqual({ width: 700, height: 700 });
-    expect(offsets).toEqual([0, 20, 40, 60, 80]);
+    expect(offsets).toEqual([0, 50]);
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download Collection" }).click();
     const download = await downloadPromise;
@@ -144,7 +157,7 @@ for (const type of ["artists", "tracks"]) {
     ).toBeVisible();
     await page.getByRole("button", { name: "Log out", exact: true }).click();
     await expect(
-      page.getByRole("link", { name: "Login with Spotify" }),
+      page.getByRole("link", { name: "Connect with Spotify" }),
     ).toBeVisible();
     expect(errors).toEqual([]);
   });
@@ -154,7 +167,7 @@ test("mobile home retains its layout and modal controls", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(
-    page.getByRole("link", { name: "Login with Spotify" }),
+    page.getByRole("link", { name: "Connect with Spotify" }),
   ).toBeVisible();
   await page.getByText("collection", { exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();

@@ -1,10 +1,11 @@
 import './style.css';
 import React from 'react';
 import { createHiDPICanvas, initializeCanvasGradient, drawCell, downloadCanvasImage } from '../../helpers/canvasHelpers';
-import { updateDocumentTitle, getHashParams, getRandomColor } from '../../helpers/utils';
+import { updateDocumentTitle, getRandomColor } from '../../helpers/utils';
 import mediaEntityMapper from '../../helpers/mediaEntityMapper';
 import { withRouter } from '../../withRouter';
 import { trackAnalyticsEvent } from '../../platform/analytics';
+import { spotifyApi } from '../../helpers/spotifyApi';
 import { Button, Header, Segment } from 'semantic-ui-react'
 
 class CollectionCanvas extends React.Component {
@@ -16,99 +17,73 @@ class CollectionCanvas extends React.Component {
 		timeRange: 'long_term',
 		isLoading: false,
 		error: null,
-		nextUrl: '',
-		mediaEntities: [],
-	}
+			mediaEntities: [],
+		}
 
 	componentDidMount() {
-		const params = getHashParams();
-
-		if (params) {
-			this.setState({
-				accessToken: params.access_token,
-				refreshToken: params.refresh_token,
-				expiresIn: params.expires_in,
-				scope: params.scope,
-				tokenType: params.token_type,
-				collectionRequestType: params.collection_request_type
-			}, () => {
-				this.getAuthenticatedUser(params.access_token);
+		const params = new URLSearchParams(window.location.search);
+		const collectionRequestType = params.get('collection_request_type');
+		this.setState({ collectionRequestType }, async () => {
+			const user = await this.getAuthenticatedUser();
+			if (!this.state.error && user) {
 				this.initializeCollectionData();
-			});
-		}
-	}
-
-	initializeCollectionData = () => {
-		const { accessToken, collectionRequestType } = this.state;
-		const getTopCallback = () => {
-			if (this.state.nextUrl) {
-				this.getTop(accessToken, collectionRequestType, this.state.nextUrl, getTopCallback);
-			} else {
-				this.createSpotifyCollection();
 			}
-		}
-
-		this.getTop(accessToken, collectionRequestType, null, () => {
-			this.getTop(accessToken, collectionRequestType, this.state.nextUrl, getTopCallback);
 		});
 	}
 
-	getAuthenticatedUser = (accessToken) => {
-		this.setState({ isLoading: true });
-		const url = 'https://api.spotify.com/v1/me';
-		const headers = {
-			Authorization: 'Bearer ' + accessToken
+	initializeCollectionData = () => {
+		const { collectionRequestType, timeRange } = this.state;
+		const limit = 50;
+		const minimumEntities = 60;
+		let offset = 0;
+		let mediaEntities = [];
+
+		const loadNextPage = () => {
+			this.getTop(collectionRequestType, offset, limit, timeRange)
+				.then(res => {
+					mediaEntities = [...mediaEntities, ...res.items.map(mediaEntityMapper)];
+					if (res.next && mediaEntities.length < minimumEntities) {
+						offset += limit;
+						loadNextPage();
+						return;
+					}
+					this.setState({ mediaEntities }, () => this.createSpotifyCollection());
+				})
+				.catch(error => {
+					this.setState({ error });
+				});
 		}
 
-		fetch(url, { headers })
-			.then(response => response.json())
-			.then(data => {
-				this.setState({ user: data });
-				if (data && data.display_name) {
-					updateDocumentTitle(data.display_name);
-				}
-			})
-			.catch(error => {
-				this.setState({ error });
-			})
+		loadNextPage();
+	}
+
+	getAuthenticatedUser = () => {
+		this.setState({ isLoading: true });
+			return spotifyApi('/api/me')
+				.then(data => {
+					this.setState({ user: data });
+					if (data && data.display_name) {
+						updateDocumentTitle(data.display_name);
+					}
+					return data;
+				})
+				.catch(error => {
+					this.setState({ error });
+					return null;
+				})
 			.finally(() => {
 				this.setState({ isLoading: false });
 			});
 	}
 
-	getTop = (accessToken, requestedType, nextUrl, callback) => {
+		getTop = (requestedType, offset, limit, timeRange) => {
 		this.setState({ isLoading: true });
-		let url;
-		let params = new URLSearchParams({ time_range: this.state.timeRange });
-		const headers = {
-			Authorization: 'Bearer ' + accessToken
-		};
-
-		if (nextUrl && nextUrl.length > 0) {
-			url = nextUrl;
-		} else {
-			url = 'https://api.spotify.com/v1/me/top/' + requestedType + '?' + params;
-		}
-
-		fetch(url , { headers })
-			.then(response => response.json())
-			.then(res => {
-				const data = res.items.map(mediaEntityMapper);
-				if (res.offset === 80) {
-					this.setState({
-						mediaEntities: [...this.state.mediaEntities, ...data],
-						nextUrl: null,
-					}, callback);
-					return;
-				}
-				this.setState({
-					mediaEntities: [...this.state.mediaEntities, ...data],
-					nextUrl: res.next,
-				}, callback);
-			})
-			.catch(error => {
-				this.setState({ error }, callback);
-			})
+		const params = new URLSearchParams({
+			time_range: timeRange,
+			offset: String(offset),
+			limit: String(limit),
+		});
+		return spotifyApi(`/api/top/${requestedType}?${params}`)
 			.finally(() => {
 				this.setState({ isLoading: false });
 			});
@@ -117,6 +92,14 @@ class CollectionCanvas extends React.Component {
 	goBackClickHandler = () => {
     const queryParams = new URLSearchParams(window.location.search);
     this.props.navigate('/?' + queryParams.toString());
+	}
+
+	logoutClickHandler = () => {
+		spotifyApi('/api/logout', { method: 'POST' })
+			.catch(error => console.error(error))
+			.finally(() => {
+				window.location.href = '/';
+			});
 	}
 
 	imgLoadCallback = (status) => {
@@ -128,7 +111,7 @@ class CollectionCanvas extends React.Component {
 		
 			let updatedCollectionIsReady = prevState.collectionIsReady;
 		
-			if (updatedImgResults.length === xRowCells * yRowCells - (profileCells - 1)) {
+			if (updatedImgResults.length >= xRowCells * yRowCells - (profileCells - 1)) {
 				updatedCollectionIsReady = updatedImgResults.every(x => x);
 			}
 		
@@ -355,7 +338,21 @@ class CollectionCanvas extends React.Component {
    }
 
 	render() {
-		const { collectionIsReady } = this.state;
+		const { collectionIsReady, error } = this.state;
+
+		if (error) {
+			return (
+				<div className="canvas-container">
+					<div className="canvas-content">
+						<Header as='h1' block attached='top'>Spotify session problem</Header>
+						<Segment attached>
+							<p>{error.message}</p>
+							<Button onClick={() => this.props.navigate('/')}>Home</Button>
+						</Segment>
+					</div>
+				</div>
+			)
+		}
 
 		return (
 			<React.Fragment>
@@ -371,7 +368,7 @@ class CollectionCanvas extends React.Component {
 								{ collectionIsReady
 									? (
 										<React.Fragment>
-											<Button negative onClick={() => window.location.href = '/' }>Log out</Button>
+											<Button negative onClick={this.logoutClickHandler}>Log out</Button>
 											<Button style={{ margin: '0 1em' }} onClick={this.handleDownloadCollectionClick} positive>Download Collection</Button>
 											<Button onClick={this.goBackClickHandler}>Go Back</Button>
 										</React.Fragment>

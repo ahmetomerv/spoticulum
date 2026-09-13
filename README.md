@@ -17,8 +17,9 @@ npm --prefix server ci
 cp server/.env.example server/.env
 ```
 
-Fill in the Spotify application credentials. Never put `CLIENT_SECRET` in the
-client environment. Spotify's registered callback must exactly match
+Fill in the Spotify application credentials and a long random `SESSION_SECRET`.
+Never put `CLIENT_SECRET`, `SESSION_SECRET`, access tokens, or refresh tokens in
+the client environment. Spotify's registered callback must exactly match
 `REDIRECTURI`; use `127.0.0.1`, not `localhost`, for a local OAuth callback.
 
 ## Development
@@ -30,9 +31,9 @@ npm run dev
 ```
 
 Open `http://127.0.0.1:3000`. The API runs on port 8888. Vite also proxies `/api`
-to that port. Press `Ctrl+C` to stop both processes. Existing domain components
-retain their original login URLs: `http://localhost:8888/api/login` in
-development and `https://spoticulum.xyz/api/login` in production.
+to that port. Press `Ctrl+C` to stop both processes. The browser uses same-origin
+`/api/login`, `/api/me`, `/api/top/:type`, and `/api/logout` routes; Spotify
+tokens stay in the Express session and are never returned in client URLs.
 
 The public analytics setting accepts `VITE_GA` or the original `REACT_APP_GA`.
 Only this setting is exposed by the Vite compatibility configuration. Analytics

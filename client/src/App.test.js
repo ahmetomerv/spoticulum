@@ -1,8 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
-import { expect, test } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({ error: "Not authenticated" }, { status: 401 }),
+    ),
+  );
+});
 
 test("preserves the login screen and legal navigation", async () => {
   const user = userEvent.setup();
@@ -12,9 +21,11 @@ test("preserves the login screen and legal navigation", async () => {
     </MemoryRouter>,
   );
   expect(
-    screen.getByRole("link", { name: "Connect with Spotify" }),
+    await screen.findByRole("link", { name: "Connect with Spotify" }),
   ).toBeVisible();
-  expect(screen.getByText(/Spotify is a trademark of Spotify AB/)).toBeVisible();
+  expect(
+    screen.getByText(/Spotify is a trademark of Spotify AB/),
+  ).toBeVisible();
   await user.click(
     screen.getByRole("link", { name: "Terms of Service & Privacy Policy" }),
   );
@@ -25,9 +36,9 @@ test("preserves the login screen and legal navigation", async () => {
   expect(
     screen.getByText(/access-token response fields are temporarily included/),
   ).toBeVisible();
-  expect(screen.getAllByRole("link", { name: "spoticulum@ahmeto.com" })).toHaveLength(
-    4,
-  );
+  expect(
+    screen.getAllByRole("link", { name: "spoticulum@ahmeto.com" }),
+  ).toHaveLength(4);
 });
 
 test("preserves the example modal and its close action", async () => {
@@ -37,7 +48,7 @@ test("preserves the example modal and its close action", async () => {
       <App />
     </MemoryRouter>,
   );
-  await user.click(screen.getByText("collection", { exact: true }));
+  await user.click(await screen.findByText("collection", { exact: true }));
   expect(screen.getByRole("dialog", { name: "Example:" })).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Ok" }));
   expect(

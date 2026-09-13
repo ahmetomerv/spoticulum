@@ -14,7 +14,8 @@ import {
 import Spinner from './../Spinner';
 import { withRouter } from '../withRouter';
 import MainLogo from './MainLogo/MainLogo';
-import { updateDocumentTitle, getHashParams } from '../helpers/utils';
+import { updateDocumentTitle } from '../helpers/utils';
+import { spotifyApi } from '../helpers/spotifyApi';
 
 class Home extends React.Component {
 
@@ -23,59 +24,56 @@ class Home extends React.Component {
     this.handleModal = this.handleModal.bind(this);
   }
 
-  state = {
-		accessToken: '',
-		refreshToken: '',
-		tokenType: '',
-		expiresIn: null,
-		scope: '',
-		error: null,
-		user: null,
-		isLoading: false,
-    exampleModalOpen: false,
-	}
-
-  componentDidMount() {
-		const params = getHashParams();
-
-		if (params) {
-			this.setState({
-				accessToken: params.access_token,
-				refreshToken: params.refresh_token,
-				expiresIn: params.expires_in,
-				scope: params.scope,
-				tokenType: params.token_type,
-			}, () => {
-				if (params.access_token) {
-					this.getAuthenticatedUser(params.access_token);
-				}
-			});
+	  state = {
+			error: null,
+			user: null,
+			isLoading: false,
+	    exampleModalOpen: false,
 		}
-	}
-
-  getAuthenticatedUser = (accessToken) => {
-		this.setState({ isLoading: true });
-		const url = 'https://api.spotify.com/v1/me';
-		const headers = {
-			Authorization: 'Bearer ' + accessToken
+	
+	  componentDidMount() {
+			const params = new URLSearchParams(window.location.search);
+			const authError = params.get('auth_error');
+			if (authError) {
+				this.setState({ error: new Error('Spotify authorization was cancelled or failed.') });
+				this.props.navigate('/', { replace: true });
+				return;
+			}
+			if (params.get('auth')) {
+				this.props.navigate('/', { replace: true });
+			}
+			this.getAuthenticatedUser();
+		}
+	
+	  getAuthenticatedUser = () => {
+			this.setState({ isLoading: true });
+			spotifyApi('/api/me')
+				.then(data => {
+					this.setState({ user: data });
+					if (data && data.display_name) {
+						updateDocumentTitle(data.display_name);
+					}
+				})
+				.catch(error => {
+					if (error.status === 401) {
+						this.setState({ user: null });
+					} else {
+						console.error(error);
+						this.setState({ error });
+					}
+				})
+				.finally(() => {
+					this.setState({ isLoading: false });
+				});
 		}
 
-		fetch(url, { headers })
-			.then(response => response.json())
-			.then(data => {
-				this.setState({ user: data });
-				if (data && data.display_name) {
-					updateDocumentTitle(data.display_name);
-				}
-			})
-			.catch(error => {
-				console.error(error);
-				this.setState({ error });
-			})
-			.finally(() => {
-				this.setState({ isLoading: false });
-			});
-	}
+	  handleLogout = () => {
+			spotifyApi('/api/logout', { method: 'POST' })
+				.catch(error => console.error(error))
+				.finally(() => {
+					window.location = window.location.pathname;
+				});
+		}
 
   handleTypeChange = (value) => (e) => {
     const queryParams = new URLSearchParams(window.location.search);
@@ -83,22 +81,14 @@ class Home extends React.Component {
     this.props.navigate('/collection?' + queryParams.toString());
 	}
 
-  isDev = () => {
-    return !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
-  }
-
-  handleModal(boolean) {
+	  handleModal(boolean) {
     this.setState({ exampleModalOpen: boolean });
   }
 
   render() {
 		const { isLoading, user, exampleModalOpen } = this.state;
 
-    let loginUrl = 'https://spoticulum.xyz/api/login';
-
-    if (this.isDev()) {
-      loginUrl = 'http://localhost:8888/api/login';
-    }
+	    let loginUrl = '/api/login';
 
     let profileUrl = 'default-profile-icon.jpeg';
     const exampleCollectionUrl = 'example-collection.jpeg';
@@ -111,20 +101,17 @@ class Home extends React.Component {
 			return <Spinner/>;
 		}
 
-    if (user && user.error) {
-      return (
-        <div>
-          <div>
-            { user.error.status }: { user.error.message }
-          </div>
-          <div>
-            Please login again
-          </div>
-          <div>
-          <Button onClick={() => window.location = window.location.pathname }>
-            Home
-          </Button>
-          </div>
+	    if (this.state.error) {
+	      return (
+	        <div>
+	          <div>
+	            { this.state.error.message }
+	          </div>
+	          <div>
+	          <Button onClick={() => this.setState({ error: null })}>
+	            Home
+	          </Button>
+	          </div>
         </div>
       )
     }
@@ -164,7 +151,7 @@ class Home extends React.Component {
                     <Divider/>
                     <br/><br/>
                     <div>
-                      <Button negative onClick={() => window.location = window.location.pathname }>
+	                      <Button negative onClick={this.handleLogout}>
                         Log out
                       </Button>
                     </div>
