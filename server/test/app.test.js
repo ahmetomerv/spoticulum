@@ -40,6 +40,14 @@ test("authorization redirect preserves the Spotify scopes and callback", async (
   assert.match(response.headers["set-cookie"][0], /SameSite=Lax/);
 });
 
+test("production OAuth state cookies are secure", async () => {
+  const response = await withServer(
+    createApp({ env: { ...env, NODE_ENV: "production" } }),
+    (server) => request(server).get("/api/login").expect(302),
+  );
+  assert.match(response.headers["set-cookie"][0], /; Secure/);
+});
+
 test("callback stores tokens server-side and redirects without exposing them", async () => {
   const token = {
     access_token: "a+b&c",
@@ -78,13 +86,17 @@ test("callback stores tokens server-side and redirects without exposing them", a
       /spoticulum_session=/,
     );
     assert.match(response.headers["set-cookie"].join("\n"), /HttpOnly/);
+    assert.match(
+      response.headers["set-cookie"].join("\n"),
+      /spoticulum_oauth_state=;.*Max-Age=0/,
+    );
     assert.equal(response.headers["cache-control"], "no-store");
     const me = await agent.get("/api/me").expect(200);
     assert.deepEqual(me.body, profile);
   });
 });
 
-test("malformed callback codes are rejected before calling Spotify", async () => {
+test("callbacks require matching state and consume it before calling Spotify", async () => {
   const app = createApp({
     env,
     fetchImpl: () => {
@@ -93,11 +105,32 @@ test("malformed callback codes are rejected before calling Spotify", async () =>
   });
   await withServer(app, async (server) => {
     await request(server).get("/api/logged").expect(400);
-    await request(server).get("/api/logged?code=a&code=b").expect(400);
-    await request(server)
-      .get("/api/logged?error=access_denied")
+    const agent = request.agent(server);
+    const login = await agent.get("/api/login").expect(302);
+    const state = new URL(login.headers.location).searchParams.get("state");
+    const invalid = await agent
+      .get("/api/logged")
+      .query({ code: "abc", state: `${state}-tampered` })
+      .expect(400);
+    assert.match(
+      invalid.headers["set-cookie"].join("\n"),
+      /spoticulum_oauth_state=;.*Max-Age=0/,
+    );
+    await agent.get("/api/logged").query({ code: "abc", state }).expect(400);
+
+    const deniedLogin = await agent.get("/api/login").expect(302);
+    const deniedState = new URL(deniedLogin.headers.location).searchParams.get(
+      "state",
+    );
+    const denied = await agent
+      .get("/api/logged")
+      .query({ error: "access_denied", state: deniedState })
       .expect("Location", "http://127.0.0.1:3000/?auth_error=access_denied")
       .expect(302);
+    assert.match(
+      denied.headers["set-cookie"].join("\n"),
+      /spoticulum_oauth_state=;.*Max-Age=0/,
+    );
   });
 });
 

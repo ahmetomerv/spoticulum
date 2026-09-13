@@ -45,6 +45,16 @@ function verifySignedValue(value, secret) {
   return unsigned;
 }
 
+function timingSafeStringEqual(left, right) {
+  if (typeof left !== "string" || typeof right !== "string") return false;
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    crypto.timingSafeEqual(leftBuffer, rightBuffer)
+  );
+}
+
 function cookieHeader(name, value, { maxAge, secure, path = "/api" } = {}) {
   const parts = [
     `${name}=${encodeURIComponent(value)}`,
@@ -52,7 +62,8 @@ function cookieHeader(name, value, { maxAge, secure, path = "/api" } = {}) {
     "SameSite=Lax",
     `Path=${path}`,
   ];
-  if (maxAge) parts.push(`Max-Age=${maxAge}`);
+  if (maxAge !== undefined) parts.push(`Max-Age=${maxAge}`);
+  if (maxAge === 0) parts.push("Expires=Thu, 01 Jan 1970 00:00:00 GMT");
   if (secure) parts.push("Secure");
   return parts.join("; ");
 }
@@ -242,22 +253,18 @@ export function createAuthRoutes({
   });
 
   router.get("/logged", async (req, res) => {
+    const state = readSignedCookie(req, STATE_COOKIE);
+    appendSetCookie(
+      res,
+      clearCookieHeader(STATE_COOKIE, { secure: secureCookies }),
+    );
+    if (!state || !timingSafeStringEqual(req.query.state, state)) {
+      return res.status(400).json({ error: "Invalid Spotify callback" });
+    }
     if (typeof req.query.error === "string") {
-      appendSetCookie(
-        res,
-        clearCookieHeader(STATE_COOKIE, { secure: secureCookies }),
-      );
       return res.redirect(clientRedirect({ auth_error: req.query.error }));
     }
-    const state = readSignedCookie(req, STATE_COOKIE);
-    if (
-      typeof req.query.code !== "string" ||
-      !req.query.code ||
-      typeof req.query.state !== "string" ||
-      !state ||
-      req.query.state !== state
-    ) {
-      clearAuthCookies(res);
+    if (typeof req.query.code !== "string" || !req.query.code) {
       return res.status(400).json({ error: "Invalid Spotify callback" });
     }
     const data = await spotifyRequest(
@@ -279,10 +286,6 @@ export function createAuthRoutes({
     );
     const sessionId = createSession(data);
     setSignedCookie(res, SESSION_COOKIE, sessionId, SESSION_MAX_AGE_SECONDS);
-    appendSetCookie(
-      res,
-      clearCookieHeader(STATE_COOKIE, { secure: secureCookies }),
-    );
     res.set("Cache-Control", "no-store");
     res.redirect(clientRedirect({ auth: "success" }));
   });
