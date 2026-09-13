@@ -7,7 +7,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-	background-image: url(../public/bg-1.png);
+	background-image: url('/bg-1.png');
 	background-size: cover;
 	background-position: center;
 }

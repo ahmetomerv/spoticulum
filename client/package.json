@@ -1,47 +1,45 @@
 {
-	"name": "spoticulum-client",
-	"version": "0.1.0",
-	"private": true,
-	"dependencies": {
-		"@testing-library/jest-dom": "^6.4.2",
-		"@testing-library/react": "^15.0.2",
-		"@testing-library/user-event": "^14.5.2",
-		"react": "^18.2.0",
-		"react-dom": "^18.2.0",
-		"react-ga4": "^2.1.0",
-		"react-scripts": "5.0.1",
-		"semantic-ui-css": "^2.5.0",
-		"semantic-ui-react": "^2.1.5",
-		"web-vitals": "^3.5.2"
-	},
-	"scripts": {
-		"start": "react-scripts start PORT=8888",
-		"build": "react-scripts build",
-		"test": "react-scripts test",
-		"eject": "react-scripts eject"
-	},
-	"eslintConfig": {
-		"extends": [
-			"react-app",
-			"react-app/jest"
-		]
-	},
-	"browserslist": {
-		"production": [
-			">0.2%",
-			"not dead",
-			"not op_mini all"
-		],
-		"development": [
-			"last 1 chrome version",
-			"last 1 firefox version",
-			"last 1 safari version"
-		]
-	},
-	"devDependencies": {
-		"react-router-dom": "^6.22.3"
-	},
-	"engines": {
-		"node": "20.12.2"
-	}
+  "name": "spoticulum-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "scripts": {
+    "start": "vite --host 127.0.0.1 --port 3000 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 3000 --strictPort",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "format:check": "prettier --check package.json vite.config.js playwright.config.js eslint.config.js src/platform src/setupTests.js src/App.test.js e2e"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "1.1.23",
+    "@radix-ui/react-tooltip": "1.2.16",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-ga4": "3.0.1",
+    "react-router-dom": "7.18.3",
+    "semantic-ui-css": "2.5.0",
+    "web-vitals": "6.2.1"
+  },
+  "devDependencies": {
+    "@eslint-react/eslint-plugin": "5.19.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "eslint": "10.10.0",
+    "globals": "17.12.0",
+    "jsdom": "30.0.1",
+    "prettier": "3.9.6",
+    "vite": "8.3.0",
+    "vitest": "5.0.0"
+  }
 }

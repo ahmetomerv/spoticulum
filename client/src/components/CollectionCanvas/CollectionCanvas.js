@@ -98,19 +98,18 @@ class CollectionCanvas extends React.Component {
 					this.setState({
 						mediaEntities: [...this.state.mediaEntities, ...data],
 						nextUrl: null,
-					});
+					}, callback);
 					return;
 				}
 				this.setState({
 					mediaEntities: [...this.state.mediaEntities, ...data],
 					nextUrl: res.next,
-				});
+				}, callback);
 			})
 			.catch(error => {
-				this.setState({ error });
+				this.setState({ error }, callback);
 			})
 			.finally(() => {
-				callback();
 				this.setState({ isLoading: false });
 			});
 	}

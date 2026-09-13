@@ -9,6 +9,10 @@ server/node_modules
 
 # production
 client/build
+client/dist
+client/coverage
+client/playwright-report
+client/test-results
 
 # misc
 .DS_Store

@@ -1,0 +1,163 @@
+import { test, expect } from "@playwright/test";
+
+test.beforeEach(async ({ page }) => {
+  await page.route(
+    /google-analytics\.com|googletagmanager\.com|fonts\.googleapis\.com/,
+    (route) => {
+      const url = route.request().url();
+      if (url.includes("fonts.googleapis.com")) {
+        return route.fulfill({
+          status: 200,
+          contentType: "text/css",
+          body: "",
+        });
+      }
+      return route.fulfill({ status: 204, body: "" });
+    },
+  );
+});
+
+test("home, popup, example modal, Escape, and legal deep link", async ({
+  page,
+}) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  await page.goto("/");
+  await expect(
+    page.getByRole("link", { name: "Login with Spotify" }),
+  ).toBeVisible();
+  await page.getByText("collection", { exact: true }).hover();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "Click to see example collection",
+  );
+  await page.getByText("collection", { exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Example:" })).toBeVisible();
+  await expect(page.locator('[role="dialog"] img')).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByText("collection", { exact: true }).click();
+  await page.getByRole("button", { name: "Ok", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page
+    .getByRole("link", { name: "Terms of Service & Privacy Policy" })
+    .click();
+  await expect(page).toHaveURL(/\/legal$/);
+  await page.reload();
+  await expect(
+    page.getByText(/Spoticulum is an independent service/),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+for (const type of ["artists", "tracks"]) {
+  test(`Spotify ${type} collection, PNG download and back navigation`, async ({
+    page,
+    baseURL,
+  }) => {
+    const errors = [];
+    const offsets = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    const image = `${baseURL}/spoticulum-logo.png`;
+    await page.route("https://api.spotify.com/v1/**", async (route) => {
+      expect(route.request().headers().authorization).toBe(
+        "Bearer fixture-access",
+      );
+      const url = new URL(route.request().url());
+      if (url.pathname === "/v1/me") {
+        await route.fulfill({
+          json: {
+            id: "listener",
+            display_name: "Test Listener",
+            images: [{ url: image }],
+            external_urls: {
+              spotify: "https://open.spotify.com/user/listener",
+            },
+          },
+        });
+      } else {
+        const offset = Number(url.searchParams.get("offset") || 0);
+        offsets.push(offset);
+        const items = Array.from({ length: 20 }, (_, index) => ({
+          id: `${type}-${offset + index}`,
+          ...(type === "artists"
+            ? { images: [{ url: image }] }
+            : { album: { images: [{ url: image }] } }),
+        }));
+        await route.fulfill({
+          json: {
+            items,
+            offset,
+            next:
+              offset < 80
+                ? `https://api.spotify.com/v1/me/top/${type}?offset=${offset + 20}`
+                : null,
+          },
+        });
+      }
+    });
+    await page.goto(
+      "/?access_token=fixture-access&refresh_token=fixture-refresh&token_type=Bearer&expires_in=3600",
+    );
+    await expect(
+      page.getByText("Test Listener", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", {
+        name: type === "artists" ? "Artists" : "Albums",
+        exact: true,
+      })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Download Collection" }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.locator("#canvas canvas")).toHaveCount(1);
+    expect(
+      await page
+        .locator("canvas")
+        .evaluate((canvas) => ({ width: canvas.width, height: canvas.height })),
+    ).toEqual({ width: 700, height: 700 });
+    expect(offsets).toEqual([0, 20, 40, 60, 80]);
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download Collection" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe(
+      "testlistener-spotify-collection.png",
+    );
+    const stream = await download.createReadStream();
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(chunk);
+    expect(Buffer.concat(chunks).subarray(0, 8).toString("hex")).toBe(
+      "89504e470d0a1a0a",
+    );
+    await page.getByRole("button", { name: "Go Back" }).click();
+    await expect(
+      page.getByRole("button", { name: "Artists", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Log out", exact: true }).click();
+    await expect(
+      page.getByRole("link", { name: "Login with Spotify" }),
+    ).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+}
+
+test("mobile home retains its layout and modal controls", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(
+    page.getByRole("link", { name: "Login with Spotify" }),
+  ).toBeVisible();
+  await page.getByText("collection", { exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Ok", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth),
+  ).toBeLessThanOrEqual(390);
+});

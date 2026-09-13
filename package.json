@@ -1,0 +1,11 @@
+{
+  "name": "spoticulum",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs"
+  }
+}

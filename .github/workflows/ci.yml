@@ -1,0 +1,33 @@
+name: Migration checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+      - run: npm --prefix client ci
+      - run: npm --prefix server ci
+      - run: npm --prefix client run lint
+      - run: npm --prefix server run lint
+      - run: npm --prefix client run format:check
+      - run: npm --prefix server run format:check
+      - run: npm --prefix client test
+      - run: npm --prefix server test
+      - run: npm --prefix client run build
+      - run: npx playwright install --with-deps chromium
+        working-directory: client
+      - run: npm run test:e2e
+        working-directory: client
+      - run: npm --prefix client audit --audit-level=high
+      - run: npm --prefix server audit --audit-level=high

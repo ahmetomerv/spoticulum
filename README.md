@@ -1,0 +1,93 @@
+# Spoticulum
+
+Spotify collection-image generator. The application remains a React SPA with a
+small Express API; this migration does not introduce a database or SSR framework.
+
+## Runtime and installation
+
+Use Node **24.21.0 LTS** (`.nvmrc`). Both packages require Node 24.21 or newer in
+the 24.x line. Node 26 is the Current release line, rather than the LTS target.
+The lockfiles were generated with Node's bundled npm **11.19.0**.
+
+```sh
+nvm install
+nvm use
+npm --prefix client ci
+npm --prefix server ci
+cp server/.env.example server/.env
+```
+
+Fill in the Spotify application credentials. Never put `CLIENT_SECRET` in the
+client environment. Spotify's registered callback must exactly match
+`REDIRECTURI`; use `127.0.0.1`, not `localhost`, for a local OAuth callback.
+
+## Development
+
+Start both the API and client after `nvm use`:
+
+```sh
+npm run dev
+```
+
+Open `http://127.0.0.1:3000`. The API runs on port 8888. Vite also proxies `/api`
+to that port. Press `Ctrl+C` to stop both processes. Existing domain components
+retain their original login URLs: `http://localhost:8888/api/login` in
+development and `https://spoticulum.xyz/api/login` in production.
+
+The public analytics setting accepts `VITE_GA` or the original `REACT_APP_GA`.
+Only this setting is exposed by the Vite compatibility configuration. Environment
+variables are embedded at build time, as they were with CRA. Leave it empty to
+disable analytics during local testing.
+
+## Verification
+
+```sh
+npm --prefix client run lint
+npm --prefix server run lint
+npm --prefix client test
+npm --prefix server test
+npm --prefix client run build
+cd client
+npx playwright install chromium
+npm run test:e2e
+```
+
+On a machine with Chrome installed, `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e`
+can use that browser instead. Browser tests start temporary servers on ports
+3100 and 3101 and cover both Vite development and Express production serving.
+Spotify responses are intercepted with fixtures; no real account is required.
+The tests verify pagination, both collection types, canvas PNG downloads, modal
+controls, mobile layout, and deep links. Live Spotify authorization still needs
+an app-specific smoke test using your registered credentials.
+
+```sh
+npm --prefix client run format:check
+npm --prefix server run format:check
+npm --prefix client audit
+npm --prefix server audit --omit=dev
+```
+
+Formatting is intentionally scoped to migration-owned files to avoid rewriting
+the existing application. See [MIGRATION.md](MIGRATION.md) for compatibility
+boundaries and retained behavior.
+
+## Production
+
+```sh
+npm --prefix client ci
+npm --prefix client run build
+npm --prefix server ci --omit=dev
+cd server
+NODE_ENV=production npm start
+```
+
+The server serves `client/build` using an absolute path, independent of its
+working directory. `/`, `/collection`, and `/legal` receive the SPA entry page;
+unknown `/api` paths remain JSON 404 responses. `/health` is a lightweight health
+endpoint. A reverse proxy should terminate HTTPS and route the application and
+API under the existing production origin.
+
+An optional multi-stage Dockerfile installs only server production dependencies
+in the final image. Build with `docker build -t spoticulum .`, then run it with
+your environment supplied at runtime. Build-time analytics can be supplied with
+`--build-arg VITE_GA=...`. No deployment is performed by this repository's CI.
