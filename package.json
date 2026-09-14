@@ -6,6 +6,13 @@
     "node": ">=24.21.0 <25"
   },
   "scripts": {
-    "dev": "node scripts/dev.mjs"
+    "dev": "node scripts/dev.mjs",
+    "build": "npm --prefix server run build",
+    "typecheck": "npm --prefix client run typecheck && npm --prefix server run typecheck",
+    "lint": "npm --prefix client run lint && npm --prefix server run lint",
+    "test": "npm --prefix client test && npm --prefix server test",
+    "test:e2e": "npm --prefix client run test:e2e",
+    "format:check": "npm --prefix client run format:check && npm --prefix server run format:check",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run format:check && npm run build"
   }
 }

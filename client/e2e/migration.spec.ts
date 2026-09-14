@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
 test("home, popup, example modal, Escape, and legal deep link", async ({
   page,
 }) => {
-  const errors = [];
+  const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
     if (
@@ -64,8 +64,8 @@ for (const type of ["artists", "tracks"]) {
   test(`Spotify ${type} collection, PNG download and back navigation`, async ({
     page,
   }) => {
-    const errors = [];
-    const offsets = [];
+    const errors: string[] = [];
+    const offsets: number[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("console", (message) => {
       if (
@@ -137,9 +137,10 @@ for (const type of ["artists", "tracks"]) {
     await expect(page.locator("#canvas canvas")).toHaveCount(1);
     expect(profileCalls).toBe(1);
     expect(
-      await page
-        .locator("canvas")
-        .evaluate((canvas) => ({ width: canvas.width, height: canvas.height })),
+      await page.locator("canvas").evaluate((canvas) => {
+        const element = canvas as HTMLCanvasElement;
+        return { width: element.width, height: element.height };
+      }),
     ).toEqual({ width: 700, height: 700 });
     expect(offsets).toEqual([0, 50]);
     const downloadPromise = page.waitForEvent("download");
@@ -218,7 +219,7 @@ test("denied Spotify authorization returns a clean cancellation message", async 
 test("a Spotify rate limit is shown instead of treating the response as collection data", async ({
   page,
 }) => {
-  const pageErrors = [];
+  const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.route("**/api/me", (route) =>
     route.fulfill({

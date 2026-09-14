@@ -1,36 +1,19 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig, loadEnv, transformWithOxc } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
   // Expose only the existing public analytics setting, never all process.env.
   const env = loadEnv(mode, process.cwd(), ["REACT_APP_GA", "VITE_GA"]);
   return {
-    plugins: [
-      {
-        name: "spoticulum-existing-jsx",
-        enforce: "pre",
-        async transform(code, id) {
-          // Preserve the existing component filenames and source verbatim.
-          if (/\/src\/.*\.js$/.test(id)) {
-            return transformWithOxc(code, id, {
-              lang: "jsx",
-              jsx: { runtime: "automatic" },
-              sourcemap: true,
-            });
-          }
-        },
-      },
-      react(),
-    ],
+    plugins: [react()],
     resolve: {
       alias: {
         "semantic-ui-react": fileURLToPath(
-          new URL("./src/platform/semantic-ui.jsx", import.meta.url),
+          new URL("./src/platform/semantic-ui.tsx", import.meta.url),
         ),
       },
     },
-    optimizeDeps: { rolldownOptions: { moduleTypes: { ".js": "jsx" } } },
     define: {
       "process.env.REACT_APP_GA": JSON.stringify(
         env.VITE_GA || env.REACT_APP_GA || "",
@@ -43,11 +26,15 @@ export default defineConfig(({ mode }) => {
       // rejected by Lightning CSS. Keep the supplied stylesheet unchanged.
       cssMinify: false,
     },
-    server: { proxy: { "/api": "http://127.0.0.1:8888" } },
+    server: {
+      proxy: {
+        "/api": process.env.VITE_API_PROXY || "http://127.0.0.1:8888",
+      },
+    },
     test: {
       environment: "jsdom",
-      setupFiles: ["./src/setupTests.js"],
-      include: ["src/**/*.test.{js,jsx}"],
+      setupFiles: ["./src/setupTests.ts"],
+      include: ["src/**/*.test.{ts,tsx}"],
       clearMocks: true,
       restoreMocks: true,
     },

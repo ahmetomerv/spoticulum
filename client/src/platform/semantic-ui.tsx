@@ -1,40 +1,65 @@
 /**
  * Compatibility boundary for the Semantic UI surface used by Spoticulum.
  * Vite maps the old import here so domain components and Semantic CSS stay intact.
- * Interactive primitives use Radix's supported React 19 refs and focus handling.
- * This is intentionally not a general replacement for semantic-ui-react.
  */
-import { cloneElement } from "react";
+import {
+  cloneElement,
+  createElement,
+  type ComponentType,
+  type CSSProperties,
+  type ElementType,
+  type FormEventHandler,
+  type HTMLAttributes,
+  type ImgHTMLAttributes,
+  type PropsWithChildren,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
 
-const classes = (...values) => values.filter(Boolean).join(" ");
+const classes = (...values: Array<string | false | null | undefined>): string =>
+  values.filter(Boolean).join(" ");
 
-function element(defaultTag, base, flags = []) {
+type SemanticElementProps = PropsWithChildren<{
+  as?: ElementType;
+  className?: string;
+  style?: CSSProperties;
+  [key: string]: unknown;
+}>;
+type SemanticComponent = ComponentType<SemanticElementProps>;
+
+function element(
+  defaultTag: ElementType,
+  base: string,
+  flags: readonly string[] = [],
+): SemanticComponent {
   return function SemanticElement({
-    as: Tag = defaultTag,
+    as,
     className,
     children,
-    ...props
-  }) {
-    const modifiers = [];
+    ...incomingProps
+  }: SemanticElementProps) {
+    const props = { ...incomingProps };
+    const modifiers: string[] = [];
     for (const flag of flags) {
-      if (props[flag])
-        modifiers.push(props[flag] === true ? flag : `${props[flag]} ${flag}`);
+      const value = props[flag];
+      if (value)
+        modifiers.push(value === true ? flag : `${String(value)} ${flag}`);
       delete props[flag];
     }
-    return (
-      <Tag
-        {...props}
-        className={classes(
+    return createElement(
+      as ?? defaultTag,
+      {
+        ...props,
+        className: classes(
           base.startsWith("ui ") && "ui",
           ...modifiers,
           base.replace(/^ui /, ""),
           className,
-        )}
-      >
-        {children}
-      </Tag>
+        ),
+      },
+      children,
     );
   };
 }
@@ -47,32 +72,52 @@ export const Header = element("div", "ui header", [
   "attached",
 ]);
 export const Divider = element("div", "ui divider");
-export const Grid = element("div", "ui grid", [
-  "inverted",
-  "stackable",
-  "divided",
-]);
-Grid.Row = element("div", "row");
-Grid.Column = element("div", "column");
-export function Form({ className, onSubmit, children, ...props }) {
-  return (
-    <form
-      {...props}
-      className={classes("ui form", className)}
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit?.(event);
-      }}
-    >
-      {children}
-    </form>
-  );
-}
-Form.Field = element("div", "field");
-Form.Group = element("div", "fields");
 
+type GridComponent = SemanticComponent & {
+  Row: SemanticComponent;
+  Column: SemanticComponent;
+};
+export const Grid = Object.assign(
+  element("div", "ui grid", ["inverted", "stackable", "divided"]),
+  {
+    Row: element("div", "row"),
+    Column: element("div", "column"),
+  },
+) as GridComponent;
+
+type FormProps = SemanticElementProps & {
+  onSubmit?: FormEventHandler<HTMLFormElement>;
+};
+type FormComponent = ComponentType<FormProps> & {
+  Field: SemanticComponent;
+  Group: SemanticComponent;
+};
+const FormRoot = ({ className, onSubmit, children, ...props }: FormProps) => (
+  <form
+    {...props}
+    className={classes("ui form", className)}
+    onSubmit={(event) => {
+      event.preventDefault();
+      onSubmit?.(event);
+    }}
+  >
+    {children}
+  </form>
+);
+export const Form = Object.assign(FormRoot, {
+  Field: element("div", "field"),
+  Group: element("div", "fields"),
+}) as FormComponent;
+
+interface ButtonProps extends SemanticElementProps {
+  basic?: boolean;
+  loading?: boolean;
+  positive?: boolean;
+  negative?: boolean;
+  disabled?: boolean;
+}
 export function Button({
-  as: Tag = "button",
+  as,
   basic,
   loading,
   positive,
@@ -81,12 +126,13 @@ export function Button({
   className,
   children,
   ...props
-}) {
-  return (
-    <Tag
-      {...props}
-      disabled={disabled}
-      className={classes(
+}: ButtonProps) {
+  return createElement(
+    as ?? "button",
+    {
+      ...props,
+      disabled,
+      className: classes(
         "ui",
         basic && "basic",
         loading && "loading",
@@ -95,14 +141,17 @@ export function Button({
         disabled && "disabled",
         "button",
         className,
-      )}
-    >
-      {children}
-    </Tag>
+      ),
+    },
+    children,
   );
 }
 
-export function Icon({ name, link, className, ...props }) {
+interface IconProps extends HTMLAttributes<HTMLElement> {
+  name: string;
+  link?: boolean;
+}
+export function Icon({ name, link, className, ...props }: IconProps) {
   return (
     <i
       {...props}
@@ -112,6 +161,12 @@ export function Icon({ name, link, className, ...props }) {
   );
 }
 
+interface ImageProps extends ImgHTMLAttributes<HTMLImageElement> {
+  wrapped?: boolean;
+  size?: string;
+  bordered?: boolean;
+  avatar?: boolean;
+}
 export function Image({
   wrapped,
   size,
@@ -121,7 +176,7 @@ export function Image({
   src,
   alt = "",
   ...props
-}) {
+}: ImageProps) {
   const imageClass = classes(
     "ui",
     size,
@@ -139,7 +194,11 @@ export function Image({
   );
 }
 
-export function Dimmer({ active, inverted, children }) {
+export function Dimmer({
+  active,
+  inverted,
+  children,
+}: PropsWithChildren<{ active?: boolean; inverted?: boolean }>) {
   return (
     <div
       className={classes(
@@ -154,7 +213,15 @@ export function Dimmer({ active, inverted, children }) {
   );
 }
 
-export function Loader({ size, inverted, content }) {
+export function Loader({
+  size,
+  inverted,
+  content,
+}: {
+  size?: string;
+  inverted?: boolean;
+  content?: string;
+}) {
   return (
     <div
       role="status"
@@ -163,7 +230,7 @@ export function Loader({ size, inverted, content }) {
         "ui",
         size,
         inverted && "inverted",
-        content && "text",
+        Boolean(content) && "text",
         "loader",
       )}
     >
@@ -172,13 +239,28 @@ export function Loader({ size, inverted, content }) {
   );
 }
 
-export function Popup({ trigger, content, size, on: _on }) {
-  // The legacy footer supplies an anchor with no href. Make that trigger
-  // keyboard accessible without editing the application component.
+interface TriggerProps {
+  tabIndex?: number;
+  href?: string;
+  role?: string;
+  "aria-label"?: string;
+}
+export function Popup({
+  trigger,
+  content,
+  size,
+  on: _on,
+}: {
+  trigger: ReactElement<TriggerProps>;
+  content: ReactNode;
+  size?: string;
+  on?: string;
+}) {
+  const label = typeof content === "string" ? content : undefined;
   const triggerElement = cloneElement(trigger, {
     tabIndex: trigger.props.tabIndex ?? 0,
     ...(trigger.type === "a" && !trigger.props.href
-      ? { role: "button", "aria-label": content }
+      ? { role: "button", "aria-label": label }
       : {}),
   });
   return (
@@ -209,7 +291,16 @@ export function Popup({ trigger, content, size, on: _on }) {
   );
 }
 
-export function Modal({ open, onOpen, onClose, children }) {
+export function Modal({
+  open,
+  onOpen,
+  onClose,
+  children,
+}: PropsWithChildren<{
+  open: boolean;
+  onOpen?: () => void;
+  onClose?: () => void;
+}>) {
   return (
     <Dialog.Root
       open={open}
@@ -238,18 +329,25 @@ export function Modal({ open, onOpen, onClose, children }) {
   );
 }
 
-export function ModalHeader({ children }) {
+export function ModalHeader({ children }: PropsWithChildren) {
   return (
     <Dialog.Title asChild>
       <div className="header">{children}</div>
     </Dialog.Title>
   );
 }
-export function ModalContent({ image, className, children, ...props }) {
+
+export function ModalContent({
+  image,
+  className,
+  children,
+  ...props
+}: PropsWithChildren<HTMLAttributes<HTMLDivElement> & { image?: boolean }>) {
   return (
     <div {...props} className={classes(image && "image", "content", className)}>
       {children}
     </div>
   );
 }
+
 export const ModalActions = element("div", "actions");

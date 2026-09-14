@@ -2,19 +2,22 @@
   "name": "spoticulum-server",
   "version": "1.0.0",
   "private": true,
-  "main": "app.js",
+  "main": "dist/app.js",
   "type": "module",
   "engines": {
     "node": ">=24.21.0 <25"
   },
   "scripts": {
-    "start": "node app.js",
-    "dev": "node --watch app.js",
-    "build": "npm run build-client",
+    "start": "node dist/app.js",
+    "dev": "tsx watch app.ts",
+    "build": "npm run build:server && npm run build-client",
+    "build:server": "npm run clean && npm run typecheck && tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build-client": "npm --prefix ../client run build",
-    "test": "node --test",
+    "test": "tsx --test test/**/*.test.ts",
     "lint": "eslint .",
-    "format:check": "prettier --check app.js src/createApp.js src/routes/authRoutes.js test package.json eslint.config.js"
+    "typecheck": "tsc --noEmit",
+    "format:check": "prettier --check app.ts src test package.json tsconfig.json tsconfig.build.json eslint.config.js"
   },
   "author": "Ahmet Ömer",
   "license": "MIT",
@@ -25,9 +28,16 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.13.4",
+    "@types/supertest": "^7.2.1",
     "eslint": "10.10.0",
     "globals": "17.12.0",
     "prettier": "3.9.6",
-    "supertest": "7.2.2"
+    "supertest": "7.2.2",
+    "tsx": "^4.23.13",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0"
   }
 }

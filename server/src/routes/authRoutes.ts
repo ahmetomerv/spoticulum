@@ -1,5 +1,9 @@
 import crypto from "node:crypto";
-import express from "express";
+import express, {
+  type Request as ExpressRequest,
+  type Response as ExpressResponse,
+  type Router,
+} from "express";
 
 const SESSION_COOKIE = "spoticulum_session";
 const STATE_COOKIE = "spoticulum_oauth_state";
@@ -8,28 +12,129 @@ const STATE_MAX_AGE_SECONDS = 60 * 10;
 const MIN_TOKEN_TTL_MS = 60 * 1000;
 const TOP_LIMIT = 50;
 
-function parseCookies(header = "") {
+export type Environment = NodeJS.ProcessEnv;
+export type FetchImplementation = (
+  input: string | URL | globalThis.Request,
+  init?: RequestInit,
+) => Promise<globalThis.Response>;
+
+interface SpotifyTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  token_type?: string;
+  scope?: string;
+  expires_in?: number;
+}
+
+export interface SpotifySession {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  scope: string;
+  expiresAt: number;
+  sessionExpiresAt: number;
+  expiryTimer: NodeJS.Timeout;
+  refreshPromise?: Promise<string>;
+}
+
+export type SessionStore = Map<string, SpotifySession>;
+
+export interface AuthRouteDependencies {
+  env?: Environment;
+  fetchImpl?: FetchImplementation;
+  sessions?: SessionStore;
+}
+
+interface CookieOptions {
+  maxAge?: number;
+  secure?: boolean;
+  path?: string;
+}
+
+interface StoredSession {
+  sessionId: string;
+  session: SpotifySession;
+}
+
+class SpotifyRequestError extends Error {
+  status: number;
+  retryAfter: string | null;
+  spotifyError: unknown;
+
+  constructor(
+    message: string,
+    status: number,
+    retryAfter: string | null = null,
+    spotifyError: unknown = null,
+  ) {
+    super(message);
+    this.name = "SpotifyRequestError";
+    this.status = status;
+    this.retryAfter = retryAfter;
+    this.spotifyError = spotifyError;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseTokenResponse(value: unknown): SpotifyTokenResponse {
+  if (!isRecord(value) || typeof value.access_token !== "string") {
+    throw new SpotifyRequestError(
+      "Spotify returned an invalid token response",
+      502,
+    );
+  }
+  return {
+    access_token: value.access_token,
+    refresh_token:
+      typeof value.refresh_token === "string" ? value.refresh_token : undefined,
+    token_type:
+      typeof value.token_type === "string" ? value.token_type : undefined,
+    scope: typeof value.scope === "string" ? value.scope : undefined,
+    expires_in:
+      typeof value.expires_in === "number" ? value.expires_in : undefined,
+  };
+}
+
+function spotifyErrorCode(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  return typeof value.error === "string" ? value.error : undefined;
+}
+
+function spotifyErrorReason(value: unknown): string | undefined {
+  if (!isRecord(value) || !isRecord(value.error)) return undefined;
+  return typeof value.error.reason === "string"
+    ? value.error.reason
+    : undefined;
+}
+
+function parseCookies(header = ""): Record<string, string> {
   return Object.fromEntries(
     header
       .split(";")
       .map((cookie) => cookie.trim())
       .filter(Boolean)
       .map((cookie) => {
-        const [name, ...value] = cookie.split("=");
+        const [name = "", ...value] = cookie.split("=");
         return [name, decodeURIComponent(value.join("="))];
       }),
   );
 }
 
-function sign(value, secret) {
+function sign(value: string, secret: string): string {
   return crypto.createHmac("sha256", secret).update(value).digest("base64url");
 }
 
-function signedValue(value, secret) {
+function signedValue(value: string, secret: string): string {
   return `${value}.${sign(value, secret)}`;
 }
 
-function verifySignedValue(value, secret) {
+function verifySignedValue(
+  value: string | undefined,
+  secret: string,
+): string | null {
   if (!value) return null;
   const dot = value.lastIndexOf(".");
   if (dot === -1) return null;
@@ -45,8 +150,8 @@ function verifySignedValue(value, secret) {
   return unsigned;
 }
 
-function timingSafeStringEqual(left, right) {
-  if (typeof left !== "string" || typeof right !== "string") return false;
+function timingSafeStringEqual(left: unknown, right: string): boolean {
+  if (typeof left !== "string") return false;
   const leftBuffer = Buffer.from(left);
   const rightBuffer = Buffer.from(right);
   return (
@@ -55,7 +160,11 @@ function timingSafeStringEqual(left, right) {
   );
 }
 
-function cookieHeader(name, value, { maxAge, secure, path = "/api" } = {}) {
+function cookieHeader(
+  name: string,
+  value: string,
+  { maxAge, secure, path = "/api" }: CookieOptions = {},
+): string {
   const parts = [
     `${name}=${encodeURIComponent(value)}`,
     "HttpOnly",
@@ -68,11 +177,14 @@ function cookieHeader(name, value, { maxAge, secure, path = "/api" } = {}) {
   return parts.join("; ");
 }
 
-function clearCookieHeader(name, { secure, path = "/api" } = {}) {
+function clearCookieHeader(
+  name: string,
+  { secure, path = "/api" }: CookieOptions = {},
+): string {
   return cookieHeader(name, "", { maxAge: 0, secure, path });
 }
 
-function appendSetCookie(res, header) {
+function appendSetCookie(res: ExpressResponse, header: string): void {
   const existing = res.getHeader("Set-Cookie");
   if (!existing) {
     res.setHeader("Set-Cookie", header);
@@ -80,18 +192,20 @@ function appendSetCookie(res, header) {
   }
   res.setHeader(
     "Set-Cookie",
-    Array.isArray(existing) ? [...existing, header] : [existing, header],
+    Array.isArray(existing)
+      ? [...existing, header]
+      : [String(existing), header],
   );
 }
 
-function tokenExpiresAt(data) {
+function tokenExpiresAt(data: SpotifyTokenResponse): number {
   const expiresIn = Number(data.expires_in);
   const lifetime =
     Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600;
   return Date.now() + lifetime * 1000;
 }
 
-function validateProductionEnvironment(env) {
+function validateProductionEnvironment(env: Environment): void {
   if (env.NODE_ENV !== "production") return;
   const required = [
     "CLIENT_ID",
@@ -99,20 +213,21 @@ function validateProductionEnvironment(env) {
     "SESSION_SECRET",
     "REDIRECTURI",
     "CLIENT_REDIRECTURI",
-  ];
+  ] as const;
   const missing = required.filter((name) => !env[name]);
   if (missing.length) {
     throw new Error(
       `Missing required production environment variables: ${missing.join(", ")}`,
     );
   }
-  if (env.SESSION_SECRET.length < 32) {
+  const sessionSecret = env.SESSION_SECRET as string;
+  if (sessionSecret.length < 32) {
     throw new Error(
       "SESSION_SECRET must be at least 32 characters in production",
     );
   }
-  const redirectUri = new URL(env.REDIRECTURI);
-  const clientRedirectUri = new URL(env.CLIENT_REDIRECTURI);
+  const redirectUri = new URL(env.REDIRECTURI as string);
+  const clientRedirectUri = new URL(env.CLIENT_REDIRECTURI as string);
   if (
     redirectUri.protocol !== "https:" ||
     clientRedirectUri.protocol !== "https:"
@@ -126,9 +241,9 @@ function validateProductionEnvironment(env) {
 
 export function createAuthRoutes({
   env = process.env,
-  fetchImpl = globalThis.fetch,
-  sessions = new Map(),
-} = {}) {
+  fetchImpl = globalThis.fetch as FetchImplementation,
+  sessions = new Map<string, SpotifySession>(),
+}: AuthRouteDependencies = {}): Router {
   validateProductionEnvironment(env);
   const router = express.Router();
   const cookieSecret =
@@ -138,65 +253,76 @@ export function createAuthRoutes({
   const secureCookies =
     env.COOKIE_SECURE === "true" || env.NODE_ENV === "production";
 
-  const spotifyRequest = async (url, options) => {
+  const spotifyRequest = async <T = unknown>(
+    url: string,
+    options: RequestInit = {},
+  ): Promise<T> => {
     const response = await fetchImpl(url, {
       ...options,
       signal: AbortSignal.timeout(10000),
     });
     const retryAfter = response.headers.get("retry-after");
-    let data;
+    let data: unknown;
     try {
       data = await response.json();
     } catch {
       data = null;
     }
     if (!response.ok) {
-      const error = new Error(`Spotify returned ${response.status}`);
-      error.status = response.status;
-      error.retryAfter = retryAfter;
-      error.spotifyError = data;
-      throw error;
+      throw new SpotifyRequestError(
+        `Spotify returned ${response.status}`,
+        response.status,
+        retryAfter,
+        data,
+      );
     }
-    return data;
+    return data as T;
   };
 
-  const clientRedirect = (params = {}) => {
-    const redirect = new URL(env.CLIENT_REDIRECTURI);
+  const clientRedirect = (params: Record<string, string> = {}): string => {
+    const redirect = new URL(
+      env.CLIENT_REDIRECTURI || "http://127.0.0.1:3000/",
+    );
     for (const [key, value] of Object.entries(params)) {
       if (value) redirect.searchParams.set(key, value);
     }
     return redirect.href;
   };
 
-  const readSignedCookie = (req, name) =>
+  const readSignedCookie = (req: ExpressRequest, name: string): string | null =>
     verifySignedValue(parseCookies(req.headers.cookie)[name], cookieSecret);
 
-  const createSession = (tokenData) => {
+  const createSession = (tokenData: SpotifyTokenResponse): string => {
     const sessionId = crypto.randomBytes(32).toString("base64url");
-    const session = {
+    const session: SpotifySession = {
       accessToken: tokenData.access_token,
-      refreshToken: tokenData.refresh_token,
+      refreshToken: tokenData.refresh_token || "",
       tokenType: tokenData.token_type || "Bearer",
       scope: tokenData.scope || "",
       expiresAt: tokenExpiresAt(tokenData),
       sessionExpiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
+      expiryTimer: setTimeout(
+        () => sessions.delete(sessionId),
+        SESSION_MAX_AGE_SECONDS * 1000,
+      ),
     };
-    session.expiryTimer = setTimeout(
-      () => sessions.delete(sessionId),
-      SESSION_MAX_AGE_SECONDS * 1000,
-    );
     session.expiryTimer.unref?.();
     sessions.set(sessionId, session);
     return sessionId;
   };
 
-  const deleteSession = (sessionId) => {
+  const deleteSession = (sessionId: string): void => {
     const session = sessions.get(sessionId);
     if (session?.expiryTimer) clearTimeout(session.expiryTimer);
     sessions.delete(sessionId);
   };
 
-  const setSignedCookie = (res, name, value, maxAge) => {
+  const setSignedCookie = (
+    res: ExpressResponse,
+    name: string,
+    value: string,
+    maxAge: number,
+  ): void => {
     appendSetCookie(
       res,
       cookieHeader(name, signedValue(value, cookieSecret), {
@@ -206,7 +332,7 @@ export function createAuthRoutes({
     );
   };
 
-  const clearAuthCookies = (res) => {
+  const clearAuthCookies = (res: ExpressResponse): void => {
     appendSetCookie(
       res,
       clearCookieHeader(SESSION_COOKIE, { secure: secureCookies }),
@@ -217,7 +343,7 @@ export function createAuthRoutes({
     );
   };
 
-  const getSession = (req) => {
+  const getSession = (req: ExpressRequest): StoredSession | null => {
     const sessionId = readSignedCookie(req, SESSION_COOKIE);
     if (!sessionId) return null;
     const session = sessions.get(sessionId);
@@ -229,49 +355,54 @@ export function createAuthRoutes({
     return { sessionId, session };
   };
 
-  const requireSession = (req, res) => {
+  const requireSession = (
+    req: ExpressRequest,
+    res: ExpressResponse,
+  ): StoredSession | null => {
     const stored = getSession(req);
     if (stored) return stored;
     res.status(401).json({ error: "Not authenticated" });
     return null;
   };
 
-  const refreshAccessToken = async (session, staleAccessToken) => {
+  const refreshAccessToken = async (
+    session: SpotifySession,
+    staleAccessToken: string,
+  ): Promise<string> => {
     if (session.accessToken !== staleAccessToken) return session.accessToken;
     if (session.refreshPromise) return session.refreshPromise;
     if (!session.refreshToken) {
-      const error = new Error("Spotify session expired");
-      error.status = 401;
-      throw error;
+      throw new SpotifyRequestError("Spotify session expired", 401);
     }
+    const refreshToken = session.refreshToken;
     session.refreshPromise = (async () => {
-      let data;
+      let data: SpotifyTokenResponse;
       try {
-        data = await spotifyRequest("https://accounts.spotify.com/api/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            Accept: "application/json",
+        const response = await spotifyRequest(
+          "https://accounts.spotify.com/api/token",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              Accept: "application/json",
+            },
+            body: new URLSearchParams({
+              grant_type: "refresh_token",
+              refresh_token: refreshToken,
+              client_id: env.CLIENT_ID || "",
+              client_secret: env.CLIENT_SECRET || "",
+            }),
           },
-          body: new URLSearchParams({
-            grant_type: "refresh_token",
-            refresh_token: session.refreshToken,
-            client_id: env.CLIENT_ID,
-            client_secret: env.CLIENT_SECRET,
-          }),
-        });
+        );
+        data = parseTokenResponse(response);
       } catch (error) {
         if (
+          error instanceof SpotifyRequestError &&
           error.status === 400 &&
-          error.spotifyError?.error === "invalid_grant"
+          spotifyErrorCode(error.spotifyError) === "invalid_grant"
         ) {
           error.status = 401;
         }
-        throw error;
-      }
-      if (!data.access_token) {
-        const error = new Error("Spotify returned an invalid token response");
-        error.status = 502;
         throw error;
       }
       session.accessToken = data.access_token;
@@ -288,16 +419,22 @@ export function createAuthRoutes({
     }
   };
 
-  const ensureAccessToken = async (session) => {
+  const ensureAccessToken = async (
+    session: SpotifySession,
+  ): Promise<string> => {
     if (session.expiresAt - Date.now() > MIN_TOKEN_TTL_MS) {
       return session.accessToken;
     }
     return refreshAccessToken(session, session.accessToken);
   };
 
-  const spotifyUserRequest = async (session, url, options = {}) => {
-    const requestWithToken = (accessToken) =>
-      spotifyRequest(url, {
+  const spotifyUserRequest = async <T = unknown>(
+    session: SpotifySession,
+    url: string,
+    options: RequestInit = {},
+  ): Promise<T> => {
+    const requestWithToken = (accessToken: string): Promise<T> =>
+      spotifyRequest<T>(url, {
         ...options,
         headers: {
           ...options.headers,
@@ -308,7 +445,9 @@ export function createAuthRoutes({
     try {
       return await requestWithToken(accessToken);
     } catch (error) {
-      if (error.status !== 401) throw error;
+      if (!(error instanceof SpotifyRequestError) || error.status !== 401) {
+        throw error;
+      }
       const refreshedAccessToken = await refreshAccessToken(
         session,
         accessToken,
@@ -317,8 +456,16 @@ export function createAuthRoutes({
     }
   };
 
-  const sendSpotifyError = (res, error, stored) => {
-    const status = error.status || 502;
+  const sendSpotifyError = (
+    res: ExpressResponse,
+    error: unknown,
+    stored: StoredSession | null,
+  ): ExpressResponse => {
+    const spotifyError =
+      error instanceof SpotifyRequestError
+        ? error
+        : new SpotifyRequestError("Spotify request failed", 502);
+    const status = spotifyError.status || 502;
     if (status === 401) {
       if (stored) deleteSession(stored.sessionId);
       clearAuthCookies(res);
@@ -331,16 +478,18 @@ export function createAuthRoutes({
       });
     }
     if (status === 429) {
-      const reason = error.spotifyError?.error?.reason;
-      if (error.retryAfter) res.set("Retry-After", error.retryAfter);
+      const reason = spotifyErrorReason(spotifyError.spotifyError);
+      if (spotifyError.retryAfter) {
+        res.set("Retry-After", spotifyError.retryAfter);
+      }
       return res.status(429).json({
         error:
           reason === "QUOTA_EXCEEDED"
             ? "Spotify's development quota has been exceeded. Try again later or contact the app owner."
-            : error.retryAfter
-              ? `Spotify rate limit reached. Try again in ${error.retryAfter} seconds.`
+            : spotifyError.retryAfter
+              ? `Spotify rate limit reached. Try again in ${spotifyError.retryAfter} seconds.`
               : "Spotify rate limit reached. Try again shortly.",
-        retryAfter: error.retryAfter,
+        retryAfter: spotifyError.retryAfter || undefined,
         reason,
       });
     }
@@ -354,9 +503,9 @@ export function createAuthRoutes({
     setSignedCookie(res, STATE_COOKIE, state, STATE_MAX_AGE_SECONDS);
     const query = new URLSearchParams({
       response_type: "code",
-      client_id: env.CLIENT_ID,
+      client_id: env.CLIENT_ID || "",
       scope: "user-top-read",
-      redirect_uri: env.REDIRECTURI,
+      redirect_uri: env.REDIRECTURI || "",
       state,
     });
     res.redirect(`https://accounts.spotify.com/authorize?${query}`);
@@ -377,7 +526,7 @@ export function createAuthRoutes({
     if (typeof req.query.code !== "string" || !req.query.code) {
       return res.status(400).json({ error: "Invalid Spotify callback" });
     }
-    const data = await spotifyRequest(
+    const response = await spotifyRequest(
       "https://accounts.spotify.com/api/token",
       {
         method: "POST",
@@ -388,13 +537,13 @@ export function createAuthRoutes({
         body: new URLSearchParams({
           grant_type: "authorization_code",
           code: req.query.code,
-          redirect_uri: env.REDIRECTURI,
-          client_id: env.CLIENT_ID,
-          client_secret: env.CLIENT_SECRET,
+          redirect_uri: env.REDIRECTURI || "",
+          client_id: env.CLIENT_ID || "",
+          client_secret: env.CLIENT_SECRET || "",
         }),
       },
     );
-    const sessionId = createSession(data);
+    const sessionId = createSession(parseTokenResponse(response));
     setSignedCookie(res, SESSION_COOKIE, sessionId, SESSION_MAX_AGE_SECONDS);
     res.set("Cache-Control", "no-store");
     res.redirect(clientRedirect({ auth: "success" }));
@@ -421,7 +570,9 @@ export function createAuthRoutes({
     if (!["artists", "tracks"].includes(req.params.type)) {
       return res.status(400).json({ error: "Invalid collection type" });
     }
-    const offset = Number.parseInt(req.query.offset || "0", 10);
+    const rawOffset =
+      typeof req.query.offset === "string" ? req.query.offset : "0";
+    const offset = Number.parseInt(rawOffset, 10);
     if (!Number.isInteger(offset) || offset < 0) {
       return res.status(400).json({ error: "Invalid offset" });
     }

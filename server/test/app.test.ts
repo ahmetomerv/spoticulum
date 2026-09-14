@@ -1,10 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
+import type { Server } from "node:http";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import request from "supertest";
+import type { Express } from "express";
+import type {
+  FetchImplementation,
+  SpotifySession,
+} from "../src/routes/authRoutes.js";
 import { createApp } from "../src/createApp.js";
 
 const env = {
@@ -40,13 +46,41 @@ test("production requires complete secure OAuth configuration", () => {
   );
 });
 
-async function withServer(app, callback) {
+function requiredHeader(value: string | undefined, name: string): string {
+  assert.ok(value, `Expected ${name} response header`);
+  return value;
+}
+
+function setCookies(headers: Record<string, unknown>): string[] {
+  const value = headers["set-cookie"];
+  if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+    return value;
+  }
+  if (typeof value === "string") return [value];
+  assert.fail("Expected set-cookie response header");
+}
+
+function formBody(options: RequestInit): URLSearchParams {
+  assert.ok(options.body instanceof URLSearchParams);
+  return options.body;
+}
+
+function authorizationHeader(options: RequestInit): string | null {
+  return new Headers(options.headers).get("Authorization");
+}
+
+async function withServer<T>(
+  app: Express,
+  callback: (server: Server) => Promise<T> | T,
+): Promise<T> {
   const server = createServer(app);
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) =>
+    server.listen(0, "127.0.0.1", () => resolve()),
+  );
   try {
     return await callback(server);
   } finally {
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
     });
   }
@@ -56,14 +90,14 @@ test("authorization redirect preserves the Spotify scopes and callback", async (
   const response = await withServer(createApp({ env }), (server) =>
     request(server).get("/api/login").expect(302),
   );
-  const url = new URL(response.headers.location);
+  const url = new URL(requiredHeader(response.headers.location, "Location"));
   assert.equal(url.origin, "https://accounts.spotify.com");
   assert.equal(url.searchParams.get("client_id"), env.CLIENT_ID);
   assert.equal(url.searchParams.get("redirect_uri"), env.REDIRECTURI);
   assert.equal(url.searchParams.get("scope"), "user-top-read");
   assert.ok(url.searchParams.get("state"));
-  assert.match(response.headers["set-cookie"][0], /HttpOnly/);
-  assert.match(response.headers["set-cookie"][0], /SameSite=Lax/);
+  assert.match(setCookies(response.headers)[0] || "", /HttpOnly/);
+  assert.match(setCookies(response.headers)[0] || "", /SameSite=Lax/);
 });
 
 test("production OAuth state cookies are secure", async () => {
@@ -71,7 +105,7 @@ test("production OAuth state cookies are secure", async () => {
     createApp({ env: productionEnv }),
     (server) => request(server).get("/api/login").expect(302),
   );
-  assert.match(response.headers["set-cookie"][0], /; Secure/);
+  assert.match(setCookies(response.headers)[0] || "", /; Secure/);
 });
 
 test("callback stores tokens server-side and redirects without exposing them", async () => {
@@ -82,38 +116,40 @@ test("callback stores tokens server-side and redirects without exposing them", a
     expires_in: 3600,
   };
   const profile = { id: "listener", display_name: "Listener" };
-  const fetchImpl = async (url, options) => {
+  const fetchImpl: FetchImplementation = async (url, options = {}) => {
     if (url === "https://accounts.spotify.com/api/token") {
       assert.equal(options.method, "POST");
-      assert.equal(options.body.get("code"), "code+with&symbols");
-      assert.equal(options.body.get("client_secret"), env.CLIENT_SECRET);
+      assert.equal(formBody(options).get("code"), "code+with&symbols");
+      assert.equal(formBody(options).get("client_secret"), env.CLIENT_SECRET);
       assert.ok(options.signal instanceof AbortSignal);
       return Response.json(token);
     }
     assert.equal(url, "https://api.spotify.com/v1/me");
-    assert.equal(options.headers.Authorization, `Bearer ${token.access_token}`);
+    assert.equal(authorizationHeader(options), `Bearer ${token.access_token}`);
     assert.ok(options.signal instanceof AbortSignal);
     return Response.json(profile);
   };
   await withServer(createApp({ env, fetchImpl }), async (server) => {
     const agent = request.agent(server);
     const login = await agent.get("/api/login").expect(302);
-    const state = new URL(login.headers.location).searchParams.get("state");
+    const state = new URL(
+      requiredHeader(login.headers.location, "Location"),
+    ).searchParams.get("state");
     const response = await agent
       .get("/api/logged")
       .query({ code: "code+with&symbols", state })
       .expect(302);
-    const url = new URL(response.headers.location);
+    const url = new URL(requiredHeader(response.headers.location, "Location"));
     assert.equal(url.searchParams.get("auth"), "success");
     assert.equal(url.searchParams.get("access_token"), null);
     assert.equal(url.searchParams.get("refresh_token"), null);
     assert.match(
-      response.headers["set-cookie"].join("\n"),
+      setCookies(response.headers).join("\n"),
       /spoticulum_session=/,
     );
-    assert.match(response.headers["set-cookie"].join("\n"), /HttpOnly/);
+    assert.match(setCookies(response.headers).join("\n"), /HttpOnly/);
     assert.match(
-      response.headers["set-cookie"].join("\n"),
+      setCookies(response.headers).join("\n"),
       /spoticulum_oauth_state=;.*Max-Age=0/,
     );
     assert.equal(response.headers["cache-control"], "no-store");
@@ -124,9 +160,9 @@ test("callback stores tokens server-side and redirects without exposing them", a
 
 test("access tokens are refreshed server-side before they expire", async () => {
   let refreshCalls = 0;
-  const fetchImpl = async (url, options) => {
+  const fetchImpl: FetchImplementation = async (url, options = {}) => {
     if (url === "https://accounts.spotify.com/api/token") {
-      if (options.body.get("grant_type") === "authorization_code") {
+      if (formBody(options).get("grant_type") === "authorization_code") {
         return Response.json({
           access_token: "expiring-token",
           refresh_token: "refresh-token",
@@ -135,8 +171,8 @@ test("access tokens are refreshed server-side before they expire", async () => {
         });
       }
       refreshCalls += 1;
-      assert.equal(options.body.get("grant_type"), "refresh_token");
-      assert.equal(options.body.get("refresh_token"), "refresh-token");
+      assert.equal(formBody(options).get("grant_type"), "refresh_token");
+      assert.equal(formBody(options).get("refresh_token"), "refresh-token");
       return Response.json({
         access_token: "refreshed-token",
         token_type: "Bearer",
@@ -144,13 +180,15 @@ test("access tokens are refreshed server-side before they expire", async () => {
       });
     }
     assert.equal(url, "https://api.spotify.com/v1/me");
-    assert.equal(options.headers.Authorization, "Bearer refreshed-token");
+    assert.equal(authorizationHeader(options), "Bearer refreshed-token");
     return Response.json({ id: "listener" });
   };
   await withServer(createApp({ env, fetchImpl }), async (server) => {
     const agent = request.agent(server);
     const login = await agent.get("/api/login").expect(302);
-    const state = new URL(login.headers.location).searchParams.get("state");
+    const state = new URL(
+      requiredHeader(login.headers.location, "Location"),
+    ).searchParams.get("state");
     await agent.get("/api/logged").query({ code: "code", state }).expect(302);
     await agent.get("/api/me").expect(200, { id: "listener" });
   });
@@ -160,9 +198,9 @@ test("access tokens are refreshed server-side before they expire", async () => {
 test("an unexpectedly rejected access token is refreshed and retried once", async () => {
   let profileCalls = 0;
   let refreshCalls = 0;
-  const fetchImpl = async (url, options) => {
+  const fetchImpl: FetchImplementation = async (url, options = {}) => {
     if (url === "https://accounts.spotify.com/api/token") {
-      if (options.body.get("grant_type") === "authorization_code") {
+      if (formBody(options).get("grant_type") === "authorization_code") {
         return Response.json({
           access_token: "rejected-token",
           refresh_token: "refresh-token",
@@ -179,16 +217,18 @@ test("an unexpectedly rejected access token is refreshed and retried once", asyn
     }
     profileCalls += 1;
     if (profileCalls === 1) {
-      assert.equal(options.headers.Authorization, "Bearer rejected-token");
+      assert.equal(authorizationHeader(options), "Bearer rejected-token");
       return Response.json({ error: "expired" }, { status: 401 });
     }
-    assert.equal(options.headers.Authorization, "Bearer replacement-token");
+    assert.equal(authorizationHeader(options), "Bearer replacement-token");
     return Response.json({ id: "listener" });
   };
   await withServer(createApp({ env, fetchImpl }), async (server) => {
     const agent = request.agent(server);
     const login = await agent.get("/api/login").expect(302);
-    const state = new URL(login.headers.location).searchParams.get("state");
+    const state = new URL(
+      requiredHeader(login.headers.location, "Location"),
+    ).searchParams.get("state");
     await agent.get("/api/logged").query({ code: "code", state }).expect(302);
     await agent.get("/api/me").expect(200, { id: "listener" });
   });
@@ -197,10 +237,10 @@ test("an unexpectedly rejected access token is refreshed and retried once", asyn
 });
 
 test("an invalid refresh token destroys the server session", async () => {
-  const sessions = new Map();
-  const fetchImpl = async (url, options) => {
+  const sessions = new Map<string, SpotifySession>();
+  const fetchImpl: FetchImplementation = async (url, options = {}) => {
     if (url === "https://accounts.spotify.com/api/token") {
-      if (options.body.get("grant_type") === "authorization_code") {
+      if (formBody(options).get("grant_type") === "authorization_code") {
         return Response.json({
           access_token: "expiring-token",
           refresh_token: "invalid-refresh-token",
@@ -215,13 +255,15 @@ test("an invalid refresh token destroys the server session", async () => {
   await withServer(createApp({ env, fetchImpl, sessions }), async (server) => {
     const agent = request.agent(server);
     const login = await agent.get("/api/login").expect(302);
-    const state = new URL(login.headers.location).searchParams.get("state");
+    const state = new URL(
+      requiredHeader(login.headers.location, "Location"),
+    ).searchParams.get("state");
     await agent.get("/api/logged").query({ code: "code", state }).expect(302);
     assert.equal(sessions.size, 1);
     const response = await agent.get("/api/me").expect(401);
     assert.deepEqual(response.body, { error: "Spotify authorization expired" });
     assert.match(
-      response.headers["set-cookie"].join("\n"),
+      setCookies(response.headers).join("\n"),
       /spoticulum_session=;.*Max-Age=0/,
     );
     assert.equal(sessions.size, 0);
@@ -229,8 +271,8 @@ test("an invalid refresh token destroys the server session", async () => {
 });
 
 test("expired sessions are removed server-side", async () => {
-  const sessions = new Map();
-  const fetchImpl = async (url) => {
+  const sessions = new Map<string, SpotifySession>();
+  const fetchImpl: FetchImplementation = async (url) => {
     if (url === "https://accounts.spotify.com/api/token") {
       return Response.json({
         access_token: "access-token",
@@ -244,9 +286,12 @@ test("expired sessions are removed server-side", async () => {
   await withServer(createApp({ env, fetchImpl, sessions }), async (server) => {
     const agent = request.agent(server);
     const login = await agent.get("/api/login").expect(302);
-    const state = new URL(login.headers.location).searchParams.get("state");
+    const state = new URL(
+      requiredHeader(login.headers.location, "Location"),
+    ).searchParams.get("state");
     await agent.get("/api/logged").query({ code: "code", state }).expect(302);
     const session = sessions.values().next().value;
+    assert.ok(session);
     session.sessionExpiresAt = Date.now() - 1;
     await agent.get("/api/me").expect(401, { error: "Not authenticated" });
     assert.equal(sessions.size, 0);
@@ -292,7 +337,7 @@ test("Spotify permission, quota, and rate-limit errors are actionable", async ()
   ];
 
   for (const testCase of cases) {
-    const fetchImpl = async (url) => {
+    const fetchImpl: FetchImplementation = async (url) => {
       if (url === "https://accounts.spotify.com/api/token") {
         return Response.json({
           access_token: "access-token",
@@ -311,7 +356,9 @@ test("Spotify permission, quota, and rate-limit errors are actionable", async ()
     await withServer(createApp({ env, fetchImpl }), async (server) => {
       const agent = request.agent(server);
       const login = await agent.get("/api/login").expect(302);
-      const state = new URL(login.headers.location).searchParams.get("state");
+      const state = new URL(
+        requiredHeader(login.headers.location, "Location"),
+      ).searchParams.get("state");
       await agent.get("/api/logged").query({ code: "code", state }).expect(302);
       const response = await agent
         .get("/api/top/artists")
@@ -335,28 +382,30 @@ test("callbacks require matching state and consume it before calling Spotify", a
     await request(server).get("/api/logged").expect(400);
     const agent = request.agent(server);
     const login = await agent.get("/api/login").expect(302);
-    const state = new URL(login.headers.location).searchParams.get("state");
+    const state = new URL(
+      requiredHeader(login.headers.location, "Location"),
+    ).searchParams.get("state");
     const invalid = await agent
       .get("/api/logged")
       .query({ code: "abc", state: `${state}-tampered` })
       .expect(400);
     assert.match(
-      invalid.headers["set-cookie"].join("\n"),
+      setCookies(invalid.headers).join("\n"),
       /spoticulum_oauth_state=;.*Max-Age=0/,
     );
     await agent.get("/api/logged").query({ code: "abc", state }).expect(400);
 
     const deniedLogin = await agent.get("/api/login").expect(302);
-    const deniedState = new URL(deniedLogin.headers.location).searchParams.get(
-      "state",
-    );
+    const deniedState = new URL(
+      requiredHeader(deniedLogin.headers.location, "Location"),
+    ).searchParams.get("state");
     const denied = await agent
       .get("/api/logged")
       .query({ error: "access_denied", state: deniedState })
       .expect("Location", "http://127.0.0.1:3000/?auth_error=access_denied")
       .expect(302);
     assert.match(
-      denied.headers["set-cookie"].join("\n"),
+      setCookies(denied.headers).join("\n"),
       /spoticulum_oauth_state=;.*Max-Age=0/,
     );
   });
@@ -379,12 +428,12 @@ test("Express 5 handles network and upstream HTTP errors without leaking details
     const app = createApp({ env, fetchImpl });
     await withServer(app, async (server) => {
       const login = await request(server).get("/api/login").expect(302);
-      const validState = new URL(login.headers.location).searchParams.get(
-        "state",
-      );
+      const validState = new URL(
+        requiredHeader(login.headers.location, "Location"),
+      ).searchParams.get("state");
       const response = await request(server)
         .get(`/api/logged?code=abc&state=${validState}`)
-        .set("Cookie", login.headers["set-cookie"])
+        .set("Cookie", setCookies(login.headers))
         .expect(expectedStatus);
       assert.deepEqual(response.body, { error: "Spotify request failed" });
     });
@@ -392,7 +441,7 @@ test("Express 5 handles network and upstream HTTP errors without leaking details
 });
 
 test("top endpoint uses the server-side token and forwards safe query params", async () => {
-  const fetchImpl = async (url, options) => {
+  const fetchImpl: FetchImplementation = async (url, options = {}) => {
     if (url === "https://accounts.spotify.com/api/token") {
       return Response.json({
         access_token: "access-token",
@@ -401,13 +450,13 @@ test("top endpoint uses the server-side token and forwards safe query params", a
         expires_in: 3600,
       });
     }
-    const requestUrl = new URL(url);
+    const requestUrl = new URL(String(url));
     assert.equal(requestUrl.origin, "https://api.spotify.com");
     assert.equal(requestUrl.pathname, "/v1/me/top/artists");
     assert.equal(requestUrl.searchParams.get("time_range"), "long_term");
     assert.equal(requestUrl.searchParams.get("offset"), "50");
     assert.equal(requestUrl.searchParams.get("limit"), "50");
-    assert.equal(options.headers.Authorization, "Bearer access-token");
+    assert.equal(authorizationHeader(options), "Bearer access-token");
     return Response.json({ items: [], next: null });
   };
   const response = await withServer(
@@ -415,7 +464,9 @@ test("top endpoint uses the server-side token and forwards safe query params", a
     async (server) => {
       const agent = request.agent(server);
       const login = await agent.get("/api/login").expect(302);
-      const state = new URL(login.headers.location).searchParams.get("state");
+      const state = new URL(
+        requiredHeader(login.headers.location, "Location"),
+      ).searchParams.get("state");
       await agent.get("/api/logged").query({ code: "code", state }).expect(302);
       return agent
         .get("/api/top/artists?time_range=long_term&offset=50&limit=50")

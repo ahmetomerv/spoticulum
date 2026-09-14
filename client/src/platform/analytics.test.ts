@@ -22,12 +22,12 @@ describe("analytics consent", () => {
   beforeEach(() => {
     window.localStorage.clear();
     ReactGA.isInitialized = false;
-    ReactGA.gtag.mockClear();
-    ReactGA.initialize.mockReset();
-    ReactGA.initialize.mockImplementation(() => {
+    vi.mocked(ReactGA.gtag).mockClear();
+    vi.mocked(ReactGA.initialize).mockReset();
+    vi.mocked(ReactGA.initialize).mockImplementation(() => {
       ReactGA.isInitialized = true;
     });
-    ReactGA.event.mockClear();
+    vi.mocked(ReactGA.event).mockClear();
     delete window[`ga-disable-${measurementId}`];
   });
 

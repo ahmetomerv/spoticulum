@@ -13,6 +13,7 @@ client/dist
 client/coverage
 client/playwright-report
 client/test-results
+server/dist
 
 # misc
 .DS_Store

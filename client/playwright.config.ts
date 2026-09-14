@@ -18,7 +18,8 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "node ../server/app.js",
+      command:
+        "npm --prefix ../server run build:server && node ../server/dist/app.js",
       env: {
         NODE_ENV: "production",
         PORT: "3101",
@@ -33,6 +34,7 @@ export default defineConfig({
     {
       command:
         "node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 3100 --strictPort",
+      env: { VITE_API_PROXY: "http://127.0.0.1:3101" },
       url: "http://127.0.0.1:3100",
     },
   ],

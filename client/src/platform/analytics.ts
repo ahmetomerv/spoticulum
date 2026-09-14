@@ -1,16 +1,25 @@
 import ReactGA from "react-ga4";
 
 export const ANALYTICS_CONSENT_KEY = "spoticulum.analytics-consent";
+export type AnalyticsConsent = "granted" | "denied";
+type AnalyticsEvent = Parameters<typeof ReactGA.event>[0];
 
-export function getAnalyticsConsent() {
+declare global {
+  interface Window {
+    [analyticsDisabledKey: `ga-disable-${string}`]: boolean;
+  }
+}
+
+export function getAnalyticsConsent(): AnalyticsConsent | null {
   try {
-    return window.localStorage.getItem(ANALYTICS_CONSENT_KEY);
+    const consent = window.localStorage.getItem(ANALYTICS_CONSENT_KEY);
+    return consent === "granted" || consent === "denied" ? consent : null;
   } catch {
     return null;
   }
 }
 
-export function setAnalyticsConsent(value) {
+export function setAnalyticsConsent(value: AnalyticsConsent): void {
   try {
     window.localStorage.setItem(ANALYTICS_CONSENT_KEY, value);
   } catch {
@@ -18,7 +27,7 @@ export function setAnalyticsConsent(value) {
   }
 }
 
-export function enableAnalytics(measurementId) {
+export function enableAnalytics(measurementId?: string): void {
   if (!measurementId || getAnalyticsConsent() !== "granted") return;
 
   window[`ga-disable-${measurementId}`] = false;
@@ -41,7 +50,7 @@ export function enableAnalytics(measurementId) {
   }
 }
 
-export function disableAnalytics(measurementId) {
+export function disableAnalytics(measurementId?: string): void {
   if (measurementId) window[`ga-disable-${measurementId}`] = true;
   if (ReactGA.isInitialized) {
     ReactGA.gtag("consent", "update", {
@@ -53,7 +62,8 @@ export function disableAnalytics(measurementId) {
   }
 
   for (const cookie of document.cookie.split(";")) {
-    const name = cookie.split("=")[0].trim();
+    const name = cookie.split("=")[0]?.trim();
+    if (!name) continue;
     if (!name.startsWith("_ga")) continue;
     const expired = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
     document.cookie = expired;
@@ -62,7 +72,7 @@ export function disableAnalytics(measurementId) {
   }
 }
 
-export function trackAnalyticsEvent(event) {
+export function trackAnalyticsEvent(event: AnalyticsEvent): void {
   if (getAnalyticsConsent() === "granted" && ReactGA.isInitialized) {
     ReactGA.event(event);
   }

@@ -1,7 +1,8 @@
 # Spoticulum
 
-Spotify collection-image generator. The application remains a React SPA with a
-small Express API; this migration does not introduce a database or SSR framework.
+Spotify collection-image generator built as a TypeScript React SPA with a
+TypeScript Express API. The application does not require a database or SSR
+framework.
 
 ## Runtime and installation
 
@@ -30,6 +31,9 @@ Start both the API and client after `nvm use`:
 npm run dev
 ```
 
+Repository-wide commands are also available from the root: `npm run typecheck`,
+`npm run lint`, `npm test`, `npm run build`, and `npm run verify`.
+
 Open `http://127.0.0.1:3000`. The API runs on port 8888. Vite also proxies `/api`
 to that port. Press `Ctrl+C` to stop both processes. The browser uses same-origin
 `/api/login`, `/api/me`, `/api/top/:type`, and `/api/logout` routes; Spotify
@@ -50,6 +54,8 @@ analytics entirely.
 ```sh
 npm --prefix client run lint
 npm --prefix server run lint
+npm --prefix client run typecheck
+npm --prefix server run typecheck
 npm --prefix client test
 npm --prefix server test
 npm --prefix client run build
@@ -73,16 +79,16 @@ npm --prefix client audit
 npm --prefix server audit --omit=dev
 ```
 
-Formatting is intentionally scoped to migration-owned files to avoid rewriting
-the existing application. See [MIGRATION.md](MIGRATION.md) for compatibility
-boundaries and retained behavior.
+TypeScript is configured in strict mode for application code, server tests, and
+Playwright tests. The server production build is emitted to `server/dist`.
 
 ## Production
 
 ```sh
 npm --prefix client ci
-npm --prefix client run build
-npm --prefix server ci --omit=dev
+npm --prefix server ci
+npm --prefix server run build
+npm --prefix server prune --omit=dev
 cd server
 NODE_ENV=production npm start
 ```

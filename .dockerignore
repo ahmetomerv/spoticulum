@@ -4,6 +4,7 @@
 **/.env.*
 client/build
 client/dist
+server/dist
 **/coverage
 **/test-results
 **/playwright-report
