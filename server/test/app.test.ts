@@ -46,6 +46,55 @@ test("production requires complete secure OAuth configuration", () => {
   );
 });
 
+test("API CORS only reflects configured app and local development origins", async () => {
+  await withServer(createApp({ env: productionEnv }), async (server) => {
+    const productionOrigin = await request(server)
+      .get("/api/missing")
+      .set("Origin", "https://spoticulum.ahmeto.com")
+      .expect(404);
+    assert.equal(
+      productionOrigin.headers["access-control-allow-origin"],
+      "https://spoticulum.ahmeto.com",
+    );
+    assert.equal(
+      productionOrigin.headers["access-control-allow-credentials"],
+      "true",
+    );
+
+    const localOrigin = await request(server)
+      .get("/api/missing")
+      .set("Origin", "http://127.0.0.1:3000")
+      .expect(404);
+    assert.equal(
+      localOrigin.headers["access-control-allow-origin"],
+      "http://127.0.0.1:3000",
+    );
+
+    const blockedOrigin = await request(server)
+      .get("/api/missing")
+      .set("Origin", "https://example.com")
+      .expect(404);
+    assert.equal(
+      blockedOrigin.headers["access-control-allow-origin"],
+      undefined,
+    );
+    assert.equal(
+      blockedOrigin.headers["access-control-allow-credentials"],
+      undefined,
+    );
+
+    const preflight = await request(server)
+      .options("/api/me")
+      .set("Origin", "https://spoticulum.ahmeto.com")
+      .set("Access-Control-Request-Method", "GET")
+      .expect(204);
+    assert.equal(
+      preflight.headers["access-control-allow-origin"],
+      "https://spoticulum.ahmeto.com",
+    );
+  });
+});
+
 function requiredHeader(value: string | undefined, name: string): string {
   assert.ok(value, `Expected ${name} response header`);
   return value;

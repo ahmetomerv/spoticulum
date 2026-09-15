@@ -1,5 +1,5 @@
 import express, { type ErrorRequestHandler, type Express } from "express";
-import cors from "cors";
+import cors, { type CorsOptions } from "cors";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, resolve } from "node:path";
 import {
@@ -20,6 +20,15 @@ interface HttpError extends Error {
   status?: number;
 }
 
+const LOCAL_DEV_ORIGINS = [
+  "http://127.0.0.1:3000",
+  "http://localhost:3000",
+  "http://127.0.0.1:3100",
+  "http://localhost:3100",
+  "http://127.0.0.1:5173",
+  "http://localhost:5173",
+];
+
 function defaultClientBuild(): string {
   const moduleDirectory = dirname(fileURLToPath(import.meta.url));
   const projectRoot =
@@ -27,6 +36,32 @@ function defaultClientBuild(): string {
       ? resolve(moduleDirectory, "../../..")
       : resolve(moduleDirectory, "../..");
   return resolve(projectRoot, "client/build");
+}
+
+function originFromUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function createApiCorsOptions(env: Environment): CorsOptions {
+  const allowedOrigins = new Set(LOCAL_DEV_ORIGINS);
+  const clientOrigin = originFromUrl(env.CLIENT_REDIRECTURI);
+  if (clientOrigin) allowedOrigins.add(clientOrigin);
+
+  return {
+    credentials: true,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
+  };
 }
 
 export function createApp({
@@ -37,8 +72,11 @@ export function createApp({
 }: CreateAppOptions = {}): Express {
   const app = express();
   app.disable("x-powered-by");
-  // Preserve the existing cross-origin API contract during this migration.
-  app.use("/api", cors(), createAuthRoutes({ env, fetchImpl, sessions }));
+  app.use(
+    "/api",
+    cors(createApiCorsOptions(env)),
+    createAuthRoutes({ env, fetchImpl, sessions }),
+  );
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
   // Unknown API paths must not receive the SPA HTML fallback.
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
