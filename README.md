@@ -1,14 +1,40 @@
 # Spoticulum
 
-Spotify collection-image generator built as a TypeScript React SPA with a
-TypeScript Express API. The application does not require a database or SSR
-framework.
+Spoticulum is an open-source Spotify collection-image maker. Connect a Spotify account, choose top artists or top tracks, and download a shareable image assembled in the browser.
 
-## Runtime and installation
+The app is built with React, Vite, TypeScript, and an Express API. Spotify OAuth
+tokens stay on the server in an HTTP-only session; the client talks to same-origin
+`/api/*` routes and never receives Spotify access or refresh tokens.
 
-Use Node **24.21.0 LTS** (`.nvmrc`). Both packages require Node 24.21 or newer in
-the 24.x line. Node 26 is the Current release line, rather than the LTS target.
-The lockfiles were generated with Node's bundled npm **11.19.0**.
+![Spoticulum screenshot](docs/screenshot.jpeg)
+
+## Tech Stack
+
+- React 19 and Vite
+- TypeScript
+- Express 5
+- Spotify Web API
+- Vitest, Node test runner, and Playwright
+- Docker-ready production build
+
+## Requirements
+
+- Node `24.21.0` from `.nvmrc`
+- npm `11.x`
+- A Spotify Developer application
+
+Create a Spotify app in the
+[Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and add
+this local redirect URI:
+
+```text
+http://127.0.0.1:8888/api/logged
+```
+
+Use `127.0.0.1`, not `localhost`, so the callback exactly matches the local
+configuration.
+
+## Quick Start
 
 ```sh
 nvm install
@@ -18,100 +44,130 @@ npm --prefix server ci
 cp server/.env.example server/.env
 ```
 
-Fill in the Spotify application credentials and a long random `SESSION_SECRET`.
-Never put `CLIENT_SECRET`, `SESSION_SECRET`, access tokens, or refresh tokens in
-the client environment. Spotify's registered callback must exactly match
-`REDIRECTURI`; use `127.0.0.1`, not `localhost`, for a local OAuth callback.
+Edit `server/.env` with your Spotify credentials:
 
-## Development
+```sh
+CLIENT_ID=your-spotify-client-id
+CLIENT_SECRET=your-spotify-client-secret
+SESSION_SECRET=generate-a-long-random-session-secret
+REDIRECTURI=http://127.0.0.1:8888/api/logged
+CLIENT_REDIRECTURI=http://127.0.0.1:3000/
+```
 
-Start both the API and client after `nvm use`:
+Start the app:
 
 ```sh
 npm run dev
 ```
 
-Repository-wide commands are also available from the root: `npm run typecheck`,
-`npm run lint`, `npm test`, `npm run build`, and `npm run verify`.
+Open `http://127.0.0.1:3000`.
 
-Open `http://127.0.0.1:3000`. The API runs on port 8888. Vite also proxies `/api`
-to that port. Press `Ctrl+C` to stop both processes. The browser uses same-origin
-`/api/login`, `/api/me`, `/api/top/:type`, and `/api/logout` routes; Spotify
-tokens stay in the Express session and are never returned in client URLs.
-Access tokens are refreshed server-side before expiry. If Spotify rejects both
-the access token and its refresh token, the session is cleared and the user is
-prompted to reconnect.
+The API runs on `http://127.0.0.1:8888`, and Vite proxies `/api` to it during
+development.
 
-The public analytics setting accepts `VITE_GA` or the original `REACT_APP_GA`.
-Only this setting is exposed by the Vite compatibility configuration. Analytics
-loads only after explicit consent, can be disabled again from the footer, and
-does not receive Spotify profile or listening data. Environment variables are
-embedded at build time, as they were with CRA. Leave the setting empty to omit
-analytics entirely.
+## Environment Variables
 
-## Verification
+Server runtime variables:
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `CLIENT_ID` | Yes | Spotify application client ID. |
+| `CLIENT_SECRET` | Yes | Spotify application client secret. Keep this server-side only. |
+| `SESSION_SECRET` | Yes | Long random value used to sign session cookies. |
+| `REDIRECTURI` | Yes | Spotify OAuth callback URL, for example `http://127.0.0.1:8888/api/logged`. |
+| `CLIENT_REDIRECTURI` | Yes | App URL to return users to after OAuth. |
+| `PORT` | No | API port. Defaults to `8888`. |
+| `COOKIE_SECURE` | No | Set to `true` to force secure cookies outside production. |
+
+Client build variable:
+
+| Name | Required | Description |
+| --- | --- | --- |
+| `VITE_GA` | No | Optional Google Analytics measurement ID. Analytics remains disabled until the user consents. |
+
+Never put `CLIENT_SECRET`, `SESSION_SECRET`, Spotify access tokens, or Spotify
+refresh tokens in client environment variables.
+
+## Scripts
+
+Run these from the repository root:
 
 ```sh
-npm --prefix client run lint
-npm --prefix server run lint
-npm --prefix client run typecheck
-npm --prefix server run typecheck
-npm --prefix client test
-npm --prefix server test
-npm --prefix client run build
-cd client
-npx playwright install chromium
-npm run test:e2e
+npm run dev
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run verify
 ```
 
-On a machine with Chrome installed, `PLAYWRIGHT_CHANNEL=chrome npm run test:e2e`
-can use that browser instead. Browser tests start temporary servers on ports
-3100 and 3101 and cover both Vite development and Express production serving.
-Spotify responses are intercepted with fixtures; no real account is required.
-The tests verify pagination, both collection types, canvas PNG downloads, modal
-controls, mobile layout, and deep links. Live Spotify authorization still needs
-an app-specific smoke test using your registered credentials.
+`npm run verify` runs typecheck, lint, tests, format checks, and the production
+build.
+
+Useful package-specific commands:
 
 ```sh
+npm --prefix client run test:e2e
 npm --prefix client run format:check
 npm --prefix server run format:check
 npm --prefix client audit
 npm --prefix server audit --omit=dev
 ```
 
-TypeScript is configured in strict mode for application code, server tests, and
-Playwright tests. The server production build is emitted to `server/dist`.
+Install Playwright's Chromium browser before the first E2E run:
+
+```sh
+cd client
+npx playwright install chromium
+npm run test:e2e
+```
+
+The E2E tests use mocked Spotify responses, so they do not require a real Spotify
+account.
 
 ## Production
+
+Build and run locally:
 
 ```sh
 npm --prefix client ci
 npm --prefix server ci
 npm --prefix server run build
-npm --prefix server prune --omit=dev
 cd server
 NODE_ENV=production npm start
 ```
 
-The server serves `client/build` using an absolute path, independent of its
-working directory. `/`, `/collection`, and `/legal` receive the SPA entry page;
-unknown `/api` paths remain JSON 404 responses. `/health` is a lightweight health
-endpoint. A reverse proxy should terminate HTTPS and route the application and
-API under the existing production origin.
+In production:
 
-An optional multi-stage Dockerfile installs only server production dependencies
-in the final image. Build with `docker build -t spoticulum .`, then run it with
-your environment supplied at runtime. Build-time analytics can be supplied with
-`--build-arg VITE_GA=...`. No deployment is performed by this repository's CI.
+- Serve the app and API from the same HTTPS origin.
+- Set `REDIRECTURI` and `CLIENT_REDIRECTURI` to that same origin.
+- Add the production `REDIRECTURI` to the Spotify Developer Dashboard.
+- Keep `CLIENT_SECRET` and `SESSION_SECRET` as runtime secrets.
+- Use one replica unless you add a shared session store; in-memory sessions are
+  cleared on restart and are not shared across containers.
 
-For Coolify, deploy the repository with the Dockerfile build pack, repository
-root as the base directory, `/Dockerfile` as the Dockerfile location, and `8888`
-as the exposed internal port. Set the domain to
-`https://spoticulum.ahmeto.com`. Configure `CLIENT_ID`, `CLIENT_SECRET`,
-`SESSION_SECRET`, `REDIRECTURI`, and `CLIENT_REDIRECTURI` as runtime variables;
-only `VITE_GA`, when used, is a build variable. The image-provided `/health`
-check takes precedence over a Coolify-managed health check.
+The included Dockerfile builds the client and server into a single production
+image:
 
-Sessions currently live in one container's memory. Run one replica; deployments
-and restarts sign users out. Use a shared session store before enabling multiple
-replicas or requiring sessions to survive deployments.
+```sh
+docker build -t spoticulum .
+docker run --env-file server/.env -p 8888:8888 spoticulum
+```
+
+Build-time analytics can be supplied with:
+
+```sh
+docker build --build-arg VITE_GA=G-XXXXXXXXXX -t spoticulum .
+```
+
+## Security and Privacy Notes
+
+- Spotify tokens are stored only in the server session.
+- Session cookies are HTTP-only and signed.
+- Production redirect URLs must use HTTPS and share the same origin.
+- CORS only allows the configured app origin and local development origins.
+- The generated image is assembled in the browser and is not uploaded by the app.
+
+## License
+
+Spoticulum is released under the [MIT License](LICENSE).
