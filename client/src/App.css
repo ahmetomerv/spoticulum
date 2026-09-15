@@ -17,7 +17,7 @@ body {
 	position: absolute;
 	inset: -16px;
 	z-index: -1;
-	background-image: var(--spoticulum-example-image);
+	background-image: url('/screenshot.jpeg');
 	background-size: cover;
 	background-position: center;
 	filter: blur(1px);

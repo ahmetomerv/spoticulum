@@ -6,7 +6,7 @@ The app is built with React, Vite, TypeScript, and an Express API. Spotify OAuth
 tokens stay on the server in an HTTP-only session; the client talks to same-origin
 `/api/*` routes and never receives Spotify access or refresh tokens.
 
-![Spoticulum screenshot](docs/screenshot.jpeg)
+![Spoticulum screenshot](client/public/screenshot.jpeg)
 
 ## Tech Stack
 

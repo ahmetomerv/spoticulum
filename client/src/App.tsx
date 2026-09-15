@@ -1,6 +1,5 @@
 import "./App.css";
 import React from "react";
-import exampleCollectionUrl from "../../docs/screenshot.jpeg";
 import Main from "./components/Main";
 import Footer from "./components/Footer";
 import {
@@ -41,14 +40,7 @@ class App extends React.Component<Record<string, never>, AppState> {
 
   override render() {
     return (
-      <div
-        className="top-container"
-        style={
-          {
-            "--spoticulum-example-image": `url(${exampleCollectionUrl})`,
-          } as React.CSSProperties
-        }
-      >
+      <div className="top-container">
         <Main />
         <Footer
           analyticsAvailable={Boolean(googleAnalyticsId)}

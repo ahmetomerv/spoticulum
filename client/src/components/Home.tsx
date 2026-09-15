@@ -17,7 +17,6 @@ import MainLogo from "./MainLogo/MainLogo";
 import { updateDocumentTitle } from "../helpers/utils";
 import { spotifyApi } from "../helpers/spotifyApi";
 import { SpotifyApiError } from "../helpers/spotifyApi";
-import exampleCollectionUrl from "../../../docs/screenshot.jpeg";
 import type { RouterProps } from "../types/navigation";
 import type { CollectionRequestType, SpotifyProfile } from "../types/spotify";
 
@@ -114,6 +113,7 @@ class Home extends React.Component<RouterProps, HomeState> {
     const { authError, isLoading, user, exampleModalOpen } = this.state;
 
     const loginUrl = "/api/login";
+    const exampleCollectionUrl = "/screenshot.jpeg";
 
     let profileUrl = "default-profile-icon.jpeg";
 
