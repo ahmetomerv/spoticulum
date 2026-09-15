@@ -12,6 +12,7 @@ import { withRouter } from "../../withRouter";
 import { trackAnalyticsEvent } from "../../platform/analytics";
 import { spotifyApi } from "../../helpers/spotifyApi";
 import { SpotifyApiError } from "../../helpers/spotifyApi";
+import { getBestSpotifyImageUrl } from "../../helpers/spotifyImages";
 import { Button, Header, Segment } from "semantic-ui-react";
 import type { ImageResultCallback } from "../../helpers/canvasHelpers";
 import type { RouterProps } from "../../types/navigation";
@@ -278,15 +279,10 @@ class CollectionCanvas extends React.Component<
     let stepsToTake =
       stepsToTakeRight + stepsToTakeBottom + stepsToTakeLeft + stepsToTakeTop;
 
-    let profileUrl;
-
-    if (this.state.user?.images[1]) {
-      profileUrl = this.state.user.images[1].url;
-    } else if (this.state.user?.images[0]) {
-      profileUrl = this.state.user.images[0].url;
-    } else {
-      profileUrl = "spoticulum-logo.png";
-    }
+    const profileUrl = getBestSpotifyImageUrl(
+      this.state.user?.images,
+      "spoticulum-logo.png",
+    );
 
     drawCell(
       2,
@@ -460,22 +456,17 @@ class CollectionCanvas extends React.Component<
     mediaEntities: MediaEntity[],
     index: number,
   ): string =>
-    mediaEntities[index]?.images[0]?.url ||
+    getBestSpotifyImageUrl(mediaEntities[index]?.images) ||
     this.getRandomMediaEntityImgUrl(mediaEntities);
 
   getRandomMediaEntityImgUrl = (mediaEntities: MediaEntity[]): string => {
     if (mediaEntities.length) {
-      const randomNum = Math.floor(Math.random() * mediaEntities.length - 1);
-      let imgUrl;
-
+      const randomNum = Math.floor(Math.random() * mediaEntities.length);
       const randomEntity = mediaEntities[randomNum];
-      if (randomEntity?.images[0]) {
-        imgUrl = randomEntity.images[0].url;
-      } else {
-        imgUrl = this.getRandomMediaEntityImgUrl(mediaEntities);
-      }
-
-      return imgUrl;
+      return (
+        getBestSpotifyImageUrl(randomEntity?.images) ||
+        this.getRandomMediaEntityImgUrl(mediaEntities)
+      );
     }
 
     return "";
