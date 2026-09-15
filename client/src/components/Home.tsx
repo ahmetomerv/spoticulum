@@ -99,7 +99,7 @@ class Home extends React.Component<RouterProps, HomeState> {
 
   handleTypeChange = (value: CollectionRequestType) => () => {
     const queryParams = new URLSearchParams(window.location.search);
-    queryParams.append("collection_request_type", value);
+    queryParams.set("collection_request_type", value);
     this.props.navigate("/collection?" + queryParams.toString(), {
       state: { user: this.state.user },
     });

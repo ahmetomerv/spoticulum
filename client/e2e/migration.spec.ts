@@ -134,6 +134,11 @@ for (const type of ["artists", "tracks"]) {
     await expect(
       page.getByRole("button", { name: "Download Collection" }),
     ).toBeVisible({ timeout: 20000 });
+    await expect(
+      page.getByRole("heading", {
+        name: type === "artists" ? /Your top artists/ : /Your top albums/,
+      }),
+    ).toBeVisible();
     await expect(page.locator("#canvas canvas")).toHaveCount(1);
     expect(profileCalls).toBe(1);
     expect(
@@ -156,6 +161,7 @@ for (const type of ["artists", "tracks"]) {
       "89504e470d0a1a0a",
     );
     await page.getByRole("button", { name: "Go Back" }).click();
+    await expect(page).toHaveURL("/");
     await expect(
       page.getByRole("button", { name: "Artists", exact: true }),
     ).toBeVisible();
@@ -166,6 +172,66 @@ for (const type of ["artists", "tracks"]) {
     expect(errors).toEqual([]);
   });
 }
+
+test("switching from artists back to albums replaces the collection type", async ({
+  page,
+}) => {
+  const image =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luzk6QAAAABJRU5ErkJggg==";
+  const topTypes: string[] = [];
+
+  await page.route("**/api/me", async (route) => {
+    await route.fulfill({
+      json: {
+        id: "listener",
+        display_name: "Test Listener",
+        images: [{ url: image }],
+        external_urls: {
+          spotify: "https://open.spotify.com/user/listener",
+        },
+      },
+    });
+  });
+  await page.route("**/api/top/**", async (route) => {
+    const url = new URL(route.request().url());
+    const match = url.pathname.match(/\/api\/top\/([^/]+)/);
+    topTypes.push(match?.[1] || "");
+    const type = match?.[1] || "artists";
+    const offset = Number(url.searchParams.get("offset") || 0);
+    const items = Array.from({ length: 50 }, (_, index) => ({
+      id: `${type}-${offset + index}`,
+      ...(type === "artists"
+        ? { images: [{ url: image }] }
+        : { album: { images: [{ url: image }] } }),
+    }));
+    await route.fulfill({
+      json: {
+        items,
+        offset,
+        next: offset < 50 ? `/api/top/${type}?offset=${offset + 50}` : null,
+      },
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Artists", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Download Collection" }),
+  ).toBeVisible({ timeout: 20000 });
+  await page.getByRole("button", { name: "Go Back" }).click();
+  await expect(page).toHaveURL("/");
+
+  await page.getByRole("button", { name: "Albums", exact: true }).click();
+  await expect(page).toHaveURL("/collection?collection_request_type=tracks");
+  await expect(
+    page.getByRole("heading", { name: /Your top albums/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Download Collection" }),
+  ).toBeVisible({ timeout: 20000 });
+
+  expect(topTypes.slice(-2)).toEqual(["tracks", "tracks"]);
+});
 
 test("mobile home retains its layout and modal controls", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

@@ -163,7 +163,9 @@ class CollectionCanvas extends React.Component<
 
   goBackClickHandler = () => {
     const queryParams = new URLSearchParams(window.location.search);
-    this.props.navigate("/?" + queryParams.toString());
+    queryParams.delete("collection_request_type");
+    const queryString = queryParams.toString();
+    this.props.navigate(queryString ? "/?" + queryString : "/");
   };
 
   logoutClickHandler = () => {
