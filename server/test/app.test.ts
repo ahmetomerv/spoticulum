@@ -525,6 +525,44 @@ test("top endpoint uses the server-side token and forwards safe query params", a
   assert.deepEqual(response.body, { items: [], next: null });
 });
 
+test("Spotify-backed routes enforce a per-session request budget", async () => {
+  let profileCalls = 0;
+  const fetchImpl: FetchImplementation = async (url) => {
+    if (url === "https://accounts.spotify.com/api/token") {
+      return Response.json({
+        access_token: "access-token",
+        refresh_token: "refresh-token",
+        token_type: "Bearer",
+        expires_in: 3600,
+      });
+    }
+    profileCalls += 1;
+    return Response.json({ id: "listener" });
+  };
+
+  await withServer(createApp({ env, fetchImpl }), async (server) => {
+    const agent = request.agent(server);
+    const login = await agent.get("/api/login").expect(302);
+    const state = new URL(
+      requiredHeader(login.headers.location, "Location"),
+    ).searchParams.get("state");
+    await agent.get("/api/logged").query({ code: "code", state }).expect(302);
+
+    for (let i = 0; i < 30; i += 1) {
+      await agent.get("/api/me").expect(200);
+    }
+    const limited = await agent.get("/api/me").expect(429);
+    assert.equal(limited.headers["retry-after"], "60");
+    assert.equal(limited.headers["cache-control"], "no-store");
+    assert.deepEqual(limited.body, {
+      error: "Too many Spotify requests. Try again shortly.",
+      retryAfter: "60",
+    });
+  });
+
+  assert.equal(profileCalls, 30);
+});
+
 test("production serves assets and every SPA route independently of cwd, with API 404s", async () => {
   const dir = await mkdtemp(join(tmpdir(), "spoticulum-static-test-"));
   try {

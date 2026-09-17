@@ -11,6 +11,8 @@ const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 const STATE_MAX_AGE_SECONDS = 60 * 10;
 const MIN_TOKEN_TTL_MS = 60 * 1000;
 const TOP_LIMIT = 50;
+const SPOTIFY_REQUEST_WINDOW_MS = 60 * 1000;
+const SPOTIFY_REQUEST_LIMIT = 30;
 
 export type Environment = NodeJS.ProcessEnv;
 export type FetchImplementation = (
@@ -34,6 +36,8 @@ export interface SpotifySession {
   expiresAt: number;
   sessionExpiresAt: number;
   expiryTimer: NodeJS.Timeout;
+  spotifyRequestCount: number;
+  spotifyRequestWindowStartedAt: number;
   refreshPromise?: Promise<string>;
 }
 
@@ -301,6 +305,8 @@ export function createAuthRoutes({
       scope: tokenData.scope || "",
       expiresAt: tokenExpiresAt(tokenData),
       sessionExpiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
+      spotifyRequestCount: 0,
+      spotifyRequestWindowStartedAt: Date.now(),
       expiryTimer: setTimeout(
         () => sessions.delete(sessionId),
         SESSION_MAX_AGE_SECONDS * 1000,
@@ -363,6 +369,40 @@ export function createAuthRoutes({
     if (stored) return stored;
     res.status(401).json({ error: "Not authenticated" });
     return null;
+  };
+
+  const consumeSpotifyRequestBudget = (
+    session: SpotifySession,
+    res: ExpressResponse,
+  ): boolean => {
+    const now = Date.now();
+    if (
+      now - session.spotifyRequestWindowStartedAt >=
+      SPOTIFY_REQUEST_WINDOW_MS
+    ) {
+      session.spotifyRequestWindowStartedAt = now;
+      session.spotifyRequestCount = 0;
+    }
+    if (session.spotifyRequestCount >= SPOTIFY_REQUEST_LIMIT) {
+      const retryAfter = Math.max(
+        1,
+        Math.ceil(
+          (session.spotifyRequestWindowStartedAt +
+            SPOTIFY_REQUEST_WINDOW_MS -
+            now) /
+            1000,
+        ),
+      );
+      res.set("Cache-Control", "no-store");
+      res.set("Retry-After", String(retryAfter));
+      res.status(429).json({
+        error: "Too many Spotify requests. Try again shortly.",
+        retryAfter: String(retryAfter),
+      });
+      return false;
+    }
+    session.spotifyRequestCount += 1;
+    return true;
   };
 
   const refreshAccessToken = async (
@@ -552,6 +592,7 @@ export function createAuthRoutes({
   router.get("/me", async (req, res) => {
     const stored = requireSession(req, res);
     if (!stored) return;
+    if (!consumeSpotifyRequestBudget(stored.session, res)) return;
     try {
       const data = await spotifyUserRequest(
         stored.session,
@@ -576,6 +617,7 @@ export function createAuthRoutes({
     if (!Number.isInteger(offset) || offset < 0) {
       return res.status(400).json({ error: "Invalid offset" });
     }
+    if (!consumeSpotifyRequestBudget(stored.session, res)) return;
     try {
       const params = new URLSearchParams({
         time_range: "long_term",
