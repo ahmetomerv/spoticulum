@@ -17,7 +17,7 @@ body {
 	position: absolute;
 	inset: -16px;
 	z-index: -1;
-	background-image: url('/screenshot.jpeg');
+	background-image: url('https://storage.googleapis.com/pr-newsroom-wp/1/2026/09/SpotifyBogueto2026_0911_211737-6697_-ZL-1920x733.jpg');
 	background-size: cover;
 	background-position: center;
 	filter: blur(1px);
