@@ -325,6 +325,30 @@ test("denied Spotify authorization returns a clean cancellation message", async 
   ).toHaveAttribute("href", "/api/login");
 });
 
+test("a Home profile request failure can retry without reauthorizing", async ({
+  page,
+}) => {
+  let profileCalls = 0;
+  await page.route("**/api/me", (route) => {
+    profileCalls += 1;
+    return profileCalls === 1
+      ? route.fulfill({ status: 503, json: { error: "Profile unavailable" } })
+      : route.fulfill({
+          json: {
+            id: "listener",
+            display_name: "Test Listener",
+            images: [],
+          },
+        });
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("alert")).toContainText("Profile unavailable");
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByText("Test Listener", { exact: true })).toBeVisible();
+  expect(profileCalls).toBe(2);
+});
+
 test("a Spotify rate limit is shown instead of treating the response as collection data", async ({
   page,
 }) => {

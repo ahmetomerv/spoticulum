@@ -1,10 +1,12 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 
 beforeEach(() => {
+  window.history.replaceState({}, "", "/");
+  document.title = "Spoticulum";
   vi.stubGlobal(
     "fetch",
     vi.fn(async () =>
@@ -12,6 +14,13 @@ beforeEach(() => {
     ),
   );
 });
+
+const signedInProfile = {
+  id: "listener",
+  display_name: "Test Listener",
+  images: [{ url: "profile.png" }],
+  external_urls: { spotify: "https://open.spotify.com/user/listener" },
+};
 
 test("preserves the login screen and legal navigation", async () => {
   const user = userEvent.setup();
@@ -105,4 +114,184 @@ test("names footer icon controls and announces clipboard failure", async () => {
   expect(screen.getByRole("status")).toHaveTextContent(
     "Email copied to clipboard.",
   );
+});
+
+test("shows loading then the signed-in choices from a valid profile", async () => {
+  let releaseProfile: (response: Response) => void = () => {};
+  const profileResponse = new Promise<Response>((resolve) => {
+    releaseProfile = resolve;
+  });
+  const fetchMock = vi.fn(() => profileResponse);
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("status", { name: "Loading" })).toBeVisible();
+  await act(async () => {
+    releaseProfile(Response.json(signedInProfile));
+    await profileResponse;
+  });
+  expect(
+    await screen.findByRole("link", { name: "Test Listener" }),
+  ).toHaveAttribute("href", signedInProfile.external_urls.spotify);
+  expect(screen.getByRole("button", { name: "Artists" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Albums" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Log out" })).toBeVisible();
+  expect(document.title).toBe("Spoticulum of Test Listener");
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
+test("shows OAuth cancellation without requesting the profile", async () => {
+  window.history.replaceState({}, "", "/?auth_error=access_denied");
+  const fetchMock = vi.fn();
+  vi.stubGlobal("fetch", fetchMock);
+
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(
+    screen.getByText(
+      "Spotify authorization was cancelled. You can connect whenever you are ready.",
+    ),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("link", { name: "Connect with Spotify" }),
+  ).toHaveAttribute("href", "/api/login");
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(window.location.search).toBe("");
+});
+
+test("a network error offers retry and can recover", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("Network unavailable"))
+    .mockResolvedValueOnce(Response.json(signedInProfile));
+  vi.stubGlobal("fetch", fetchMock);
+  const user = userEvent.setup();
+
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText("Network unavailable")).toBeVisible();
+  await user.click(screen.getByRole("button", { name: "Try again" }));
+  expect(await screen.findByRole("button", { name: "Artists" })).toBeVisible();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test("malformed successful profile data shows an error instead of crashing", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({ id: "listener", display_name: "Listener" }),
+    ),
+  );
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(
+    await screen.findByText("Invalid Spotify profile data."),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+});
+
+test("a profile without a photo or external link remains usable", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({ id: "listener", display_name: null, images: [] }),
+    ),
+  );
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText("listener")).toBeVisible();
+  expect(screen.queryByRole("link", { name: "listener" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Artists" })).toBeVisible();
+});
+
+test("an unsafe profile URL is shown as text rather than a link", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        ...signedInProfile,
+        external_urls: { spotify: "javascript:alert(1)" },
+      }),
+    ),
+  );
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText("Test Listener")).toBeVisible();
+  expect(screen.queryByRole("link", { name: "Test Listener" })).toBeNull();
+});
+
+test("a malformed profile image is rejected before Home renders it", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        id: "listener",
+        display_name: "Listener",
+        images: [{ url: 123 }],
+      }),
+    ),
+  );
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(
+    await screen.findByText("Invalid Spotify profile data."),
+  ).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Artists" })).toBeNull();
+});
+
+test("leaving Home aborts a pending profile request and prevents a title update", async () => {
+  let releaseProfile: (response: Response) => void = () => {};
+  const profileResponse = new Promise<Response>((resolve) => {
+    releaseProfile = resolve;
+  });
+  let requestSignal: AbortSignal | undefined;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((_input: RequestInfo | URL, options?: RequestInit) => {
+      requestSignal = options?.signal || undefined;
+      return profileResponse;
+    }),
+  );
+  const user = userEvent.setup();
+
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("status", { name: "Loading" })).toBeVisible();
+  await user.click(
+    screen.getByRole("link", { name: "Terms of Service & Privacy Policy" }),
+  );
+  expect(requestSignal?.aborted).toBe(true);
+  await act(async () => {
+    releaseProfile(Response.json(signedInProfile));
+    await profileResponse;
+  });
+  expect(
+    screen.getByText(/Spoticulum is an independent service/),
+  ).toBeVisible();
+  expect(document.title).toBe("Spoticulum");
 });

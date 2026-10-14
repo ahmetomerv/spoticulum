@@ -1,4 +1,5 @@
-import React from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Image,
   Button,
@@ -11,86 +12,84 @@ import {
   Popup,
 } from "semantic-ui-react";
 import Spinner from "./../Spinner";
-import { withRouter } from "../withRouter";
 import MainLogo from "./MainLogo/MainLogo";
 import { updateDocumentTitle } from "../helpers/utils";
-import { spotifyApi } from "../helpers/spotifyApi";
-import { SpotifyApiError } from "../helpers/spotifyApi";
-import type { RouterProps } from "../types/navigation";
+import { spotifyApi, SpotifyApiError } from "../helpers/spotifyApi";
+import { parseSpotifyProfile } from "../helpers/spotifyProfile";
 import type { CollectionRequestType, SpotifyProfile } from "../types/spotify";
 
-interface HomeState {
-  authError: string | null;
-  error: Error | null;
-  user: SpotifyProfile | null;
-  isLoading: boolean;
-  exampleModalOpen: boolean;
+type HomeView =
+  | { status: "loading" }
+  | { status: "guest" }
+  | { status: "authenticated"; profile: SpotifyProfile }
+  | { status: "oauth-error"; message: string; linkLabel: string }
+  | { status: "request-error"; message: string };
+
+function oauthErrorView(code: string): HomeView {
+  if (code === "access_denied")
+    return {
+      status: "oauth-error",
+      message:
+        "Spotify authorization was cancelled. You can connect whenever you are ready.",
+      linkLabel: "Connect with Spotify",
+    };
+  return {
+    status: "oauth-error",
+    message:
+      code === "session_expired"
+        ? "Your Spotify session expired. Connect again to continue."
+        : "Spotify authorization failed. Please try connecting again.",
+    linkLabel: "Reconnect with Spotify",
+  };
 }
 
-class Home extends React.Component<RouterProps, HomeState> {
-  private exampleButtonRef = React.createRef<HTMLButtonElement>();
+function Home() {
+  const navigate = useNavigate();
+  const initialAuthError = useRef(
+    new URLSearchParams(window.location.search).get("auth_error"),
+  ).current;
+  const [view, setView] = useState<HomeView>(() =>
+    initialAuthError ? oauthErrorView(initialAuthError) : { status: "loading" },
+  );
+  const [requestAttempt, setRequestAttempt] = useState(0);
+  const [exampleModalOpen, setExampleModalOpen] = useState(false);
+  const exampleButtonRef = useRef<HTMLButtonElement>(null);
 
-  constructor(props: RouterProps) {
-    super(props);
-    this.handleModal = this.handleModal.bind(this);
-  }
-
-  override state: HomeState = {
-    authError: null,
-    error: null,
-    user: null,
-    isLoading: false,
-    exampleModalOpen: false,
-  };
-
-  override componentDidMount() {
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const authError = params.get("auth_error");
-    if (authError) {
-      const message =
-        authError === "session_expired"
-          ? "Your Spotify session expired. Connect again to continue."
-          : authError === "access_denied"
-            ? "Spotify authorization was cancelled. You can connect whenever you are ready."
-            : "Spotify authorization failed. Please try connecting again.";
-      this.setState({ authError, error: new Error(message) });
+    if (params.has("auth_error") || params.has("auth"))
       window.history.replaceState({}, "", "/");
-      return;
-    }
-    if (params.get("auth")) {
-      window.history.replaceState({}, "", "/");
-    }
-    this.getAuthenticatedUser();
-  }
+    if (initialAuthError) return;
 
-  getAuthenticatedUser = () => {
-    this.setState({ isLoading: true });
-    spotifyApi<SpotifyProfile>("/api/me")
-      .then((data) => {
-        this.setState({ user: data });
-        if (data && data.display_name) {
-          updateDocumentTitle(data.display_name);
-        }
+    const controller = new AbortController();
+    let active = true;
+    spotifyApi<unknown>("/api/me", { signal: controller.signal })
+      .then(parseSpotifyProfile)
+      .then((profile) => {
+        if (!active) return;
+        setView({ status: "authenticated", profile });
+        if (profile.display_name) updateDocumentTitle(profile.display_name);
       })
       .catch((error: unknown) => {
+        if (!active || controller.signal.aborted) return;
         if (error instanceof SpotifyApiError && error.status === 401) {
-          this.setState({ user: null });
+          setView({ status: "guest" });
         } else {
-          console.error(error);
-          this.setState({
-            error:
-              error instanceof Error
-                ? error
-                : new Error("Spotify request failed"),
+          setView({
+            status: "request-error",
+            message:
+              error instanceof Error ? error.message : "Spotify request failed",
           });
         }
-      })
-      .finally(() => {
-        this.setState({ isLoading: false });
       });
-  };
 
-  handleLogout = () => {
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [initialAuthError, requestAttempt]);
+
+  const handleLogout = () => {
     spotifyApi("/api/logout", { method: "POST" })
       .catch((error) => console.error(error))
       .finally(() => {
@@ -98,161 +97,162 @@ class Home extends React.Component<RouterProps, HomeState> {
       });
   };
 
-  handleTypeChange = (value: CollectionRequestType) => () => {
+  const handleTypeChange = (
+    value: CollectionRequestType,
+    profile: SpotifyProfile,
+  ) => {
     const queryParams = new URLSearchParams(window.location.search);
     queryParams.set("collection_request_type", value);
-    this.props.navigate("/collection?" + queryParams.toString(), {
-      state: { user: this.state.user },
+    navigate("/collection?" + queryParams.toString(), {
+      state: { user: profile },
     });
   };
 
-  handleModal(isOpen: boolean) {
-    this.setState({ exampleModalOpen: isOpen });
-  }
+  if (view.status === "loading") return <Spinner />;
 
-  override render() {
-    const { authError, isLoading, user, exampleModalOpen } = this.state;
-
-    const loginUrl = "/api/login";
-    const exampleCollectionUrl = "/screenshot.jpeg";
-
-    let profileUrl = "default-profile-icon.jpeg";
-
-    if (user?.images[0]) {
-      profileUrl = user.images[0].url;
-    }
-
-    if (isLoading) {
-      return <Spinner />;
-    }
-
-    if (this.state.error) {
-      return (
-        <div>
-          <div>{this.state.error.message}</div>
-          <div>
-            <a className="button primary-button" href="/api/login">
-              {authError === "access_denied"
-                ? "Connect with Spotify"
-                : "Reconnect with Spotify"}
-            </a>
-          </div>
-        </div>
-      );
-    }
-
+  if (view.status === "oauth-error")
     return (
-      <React.Fragment>
-        <div className="home-container">
-          <div className="login-container">
-            <div style={{ marginBottom: "3em" }}>
-              <MainLogo displayLogoTitle={true} />
-            </div>
-            {user ? (
-              <div className="ui form request-type-form">
-                <Segment>
-                  <span>Logged in as:</span>
-                  <br />
-                  <br />
-                  <Image src={profileUrl} bordered avatar />
-                  <span>
-                    <a
-                      href={user.external_urls?.spotify}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {user.display_name}
-                    </a>
-                  </span>
-                </Segment>
-                <br />
-                <div className="field">
-                  <p>Generate based on what you listen to the most:</p>
-                </div>
-                <div className="fields request-type-form-group">
-                  <Button
-                    type="button"
-                    onClick={this.handleTypeChange("artists")}
-                  >
-                    Artists
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={this.handleTypeChange("tracks")}
-                  >
-                    Albums
-                  </Button>
-                </div>
-                <br />
-                <br />
-                <Divider />
-                <br />
-                <br />
-                <div>
-                  <Button type="button" negative onClick={this.handleLogout}>
-                    Log out
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <React.Fragment>
-                <div className="login-info">
-                  Create a{" "}
-                  <Popup
-                    content="Click to see example collection"
-                    trigger={
-                      <button
-                        type="button"
-                        ref={this.exampleButtonRef}
-                        className="example-click"
-                        onClick={() => this.handleModal(true)}
-                      >
-                        visual snapshot
-                      </button>
-                    }
-                  />{" "}
-                  of your most-listened-to artists and albums.
-                </div>
-                <a className="button primary-button" href={loginUrl}>
-                  Connect with Spotify
-                </a>
-                <Divider className="footer-divider" />
-                <p className="login-legal-notice">
-                  By continuing, you agree to the{" "}
-                  <a href="/legal#terms-of-service">Terms of Service</a> and
-                  acknowledge the{" "}
-                  <a href="/legal#privacy-policy">Privacy Policy</a>.
-                </p>
-                <Modal
-                  onClose={() => this.handleModal(false)}
-                  onOpen={() => this.handleModal(true)}
-                  onCloseAutoFocus={(event) => {
-                    event.preventDefault();
-                    this.exampleButtonRef.current?.focus();
-                  }}
-                  open={exampleModalOpen}
-                >
-                  <ModalHeader>Example:</ModalHeader>
-                  <ModalContent image className="example-modal-content">
-                    <Image size="massive" src={exampleCollectionUrl} wrapped />
-                  </ModalContent>
-                  <ModalActions>
-                    <Button
-                      type="button"
-                      onClick={() => this.handleModal(false)}
-                      positive
-                    >
-                      Ok
-                    </Button>
-                  </ModalActions>
-                </Modal>
-              </React.Fragment>
-            )}
-          </div>
-        </div>
-      </React.Fragment>
+      <div>
+        <p>{view.message}</p>
+        <a className="button primary-button" href="/api/login">
+          {view.linkLabel}
+        </a>
+      </div>
     );
-  }
+
+  if (view.status === "request-error")
+    return (
+      <div>
+        <p role="alert">{view.message}</p>
+        <button
+          type="button"
+          className="button primary-button"
+          onClick={() => {
+            setView({ status: "loading" });
+            setRequestAttempt((attempt) => attempt + 1);
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    );
+
+  const profile = view.status === "authenticated" ? view.profile : null;
+  const profileUrl = profile?.images[0]?.url || "default-profile-icon.jpeg";
+
+  return (
+    <div className="home-container">
+      <div className="login-container">
+        <div style={{ marginBottom: "3em" }}>
+          <MainLogo displayLogoTitle={true} />
+        </div>
+        {profile ? (
+          <div className="ui form request-type-form">
+            <Segment>
+              <span>Logged in as:</span>
+              <br />
+              <br />
+              <Image src={profileUrl} bordered avatar />
+              <span>
+                {profile.external_urls?.spotify ? (
+                  <a
+                    href={profile.external_urls.spotify}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {profile.display_name || profile.id}
+                  </a>
+                ) : (
+                  profile.display_name || profile.id
+                )}
+              </span>
+            </Segment>
+            <br />
+            <div className="field">
+              <p>Generate based on what you listen to the most:</p>
+            </div>
+            <div className="fields request-type-form-group">
+              <Button
+                type="button"
+                onClick={() => handleTypeChange("artists", profile)}
+              >
+                Artists
+              </Button>
+              <Button
+                type="button"
+                onClick={() => handleTypeChange("tracks", profile)}
+              >
+                Albums
+              </Button>
+            </div>
+            <br />
+            <br />
+            <Divider />
+            <br />
+            <br />
+            <div>
+              <Button type="button" negative onClick={handleLogout}>
+                Log out
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="login-info">
+              Create a{" "}
+              <Popup
+                content="Click to see example collection"
+                trigger={
+                  <button
+                    type="button"
+                    ref={exampleButtonRef}
+                    className="example-click"
+                    onClick={() => setExampleModalOpen(true)}
+                  >
+                    visual snapshot
+                  </button>
+                }
+              />{" "}
+              of your most-listened-to artists and albums.
+            </div>
+            <a className="button primary-button" href="/api/login">
+              Connect with Spotify
+            </a>
+            <Divider className="footer-divider" />
+            <p className="login-legal-notice">
+              By continuing, you agree to the{" "}
+              <a href="/legal#terms-of-service">Terms of Service</a> and
+              acknowledge the <a href="/legal#privacy-policy">Privacy Policy</a>
+              .
+            </p>
+            <Modal
+              onClose={() => setExampleModalOpen(false)}
+              onOpen={() => setExampleModalOpen(true)}
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                exampleButtonRef.current?.focus();
+              }}
+              open={exampleModalOpen}
+            >
+              <ModalHeader>Example:</ModalHeader>
+              <ModalContent image className="example-modal-content">
+                <Image size="massive" src="/screenshot.jpeg" wrapped />
+              </ModalContent>
+              <ModalActions>
+                <Button
+                  type="button"
+                  onClick={() => setExampleModalOpen(false)}
+                  positive
+                >
+                  Ok
+                </Button>
+              </ModalActions>
+            </Modal>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
-export default withRouter(Home);
+export default Home;
