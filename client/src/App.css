@@ -134,6 +134,26 @@ body {
 	fill: currentColor;
 }
 
+.footer-icon-button {
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #fff;
+	font: inherit;
+	cursor: pointer;
+}
+
+.footer-icon-button:hover {
+	color: #58dea0;
+}
+
+.footer-copy-feedback:not(:empty) {
+	display: block;
+	margin-top: .5em;
+	color: #fff;
+	font-size: .6em;
+}
+
 .privacy-settings-link {
 	margin: 0 .3em;
 	padding: 0;
@@ -343,6 +363,13 @@ body {
 }
 
 .example-click {
+	appearance: none;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	font: inherit;
+	line-height: inherit;
+	vertical-align: baseline;
 	font-weight: bold;
 	color: #44b782;
 	cursor: pointer;
@@ -350,6 +377,19 @@ body {
 
 .example-click:hover {
 	text-decoration: underline;
+}
+
+.button:focus-visible,
+.example-click:focus-visible,
+.footer a:focus-visible,
+.footer button:focus-visible {
+	outline: 3px solid #236b46 !important;
+	outline-offset: 3px;
+}
+
+.footer a:focus-visible,
+.footer button:focus-visible {
+	outline-color: #58dea0 !important;
 }
 
 .ui.modal > .example-modal-content {

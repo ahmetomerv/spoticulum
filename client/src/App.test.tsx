@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -47,17 +47,62 @@ test("preserves the login screen and legal navigation", async () => {
   ).toHaveLength(4);
 });
 
-test("preserves the example modal and its close action", async () => {
+test("opens the example with the keyboard and restores focus when closed", async () => {
   const user = userEvent.setup();
   render(
     <MemoryRouter>
       <App />
     </MemoryRouter>,
   );
-  await user.click(await screen.findByText("visual snapshot", { exact: true }));
+  const example = await screen.findByRole("button", {
+    name: "visual snapshot",
+  });
+  example.focus();
+  await user.keyboard("{Enter}");
+  expect(screen.getByRole("dialog", { name: "Example:" })).toBeVisible();
+  await user.keyboard("{Escape}");
+  expect(
+    screen.queryByRole("dialog", { name: "Example:" }),
+  ).not.toBeInTheDocument();
+  await waitFor(() => expect(example).toHaveFocus());
+  await user.keyboard(" ");
   expect(screen.getByRole("dialog", { name: "Example:" })).toBeVisible();
   await user.click(screen.getByRole("button", { name: "Ok" }));
   expect(
     screen.queryByRole("dialog", { name: "Example:" }),
   ).not.toBeInTheDocument();
+});
+
+test("names footer icon controls and announces clipboard failure", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+  expect(
+    screen.getByRole("link", { name: "Ahmet Ömer on GitHub" }),
+  ).toHaveAttribute("href", "https://github.com/ahmetomerv");
+  expect(screen.getByRole("link", { name: "Ahmet Ömer on X" })).toHaveAttribute(
+    "href",
+    "https://x.com/ahmetdotme",
+  );
+  const copyEmail = screen.getByRole("button", { name: "Copy email address" });
+  const writeText = vi.fn().mockRejectedValue(new Error("Permission denied"));
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText },
+  });
+  copyEmail.focus();
+  await user.keyboard("{Enter}");
+  expect(writeText).toHaveBeenCalledWith("spoticulum@ahmeto.com");
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    "Could not copy. Email: spoticulum@ahmeto.com",
+  );
+  writeText.mockResolvedValue(undefined);
+  await user.keyboard(" ");
+  expect(writeText).toHaveBeenCalledTimes(2);
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Email copied to clipboard.",
+  );
 });

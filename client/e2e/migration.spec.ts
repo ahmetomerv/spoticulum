@@ -37,18 +37,29 @@ test("home, popup, example modal, Escape, and legal deep link", async ({
   await expect(
     page.getByRole("link", { name: "Connect with Spotify" }),
   ).toBeVisible();
-  await page.getByText("visual snapshot", { exact: true }).hover();
+  const example = page.getByRole("button", { name: "visual snapshot" });
+  await example.hover();
   await expect(page.getByRole("tooltip")).toContainText(
     "Click to see example collection",
   );
-  await page.getByText("visual snapshot", { exact: true }).click();
+  await example.focus();
+  await expect(example).toHaveCSS("outline-style", "solid");
+  await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: "Example:" })).toBeVisible();
   await expect(page.locator('[role="dialog"] img')).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByText("visual snapshot", { exact: true }).click();
+  await expect(example).toBeFocused();
+  await page.keyboard.press("Space");
   await page.getByRole("button", { name: "Ok", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  const copyEmail = page.getByRole("button", { name: "Copy email address" });
+  await copyEmail.hover();
+  await expect(page.getByRole("tooltip")).toContainText(
+    "Click to copy: spoticulum@ahmeto.com",
+  );
+  await copyEmail.focus();
+  await expect(copyEmail).toHaveCSS("outline-style", "solid");
   await page
     .getByRole("link", { name: "Terms of Service & Privacy Policy" })
     .click();
@@ -130,12 +141,14 @@ for (const type of ["artists", "tracks"]) {
     await expect(
       page.getByText("Test Listener", { exact: true }),
     ).toBeVisible();
-    await page
-      .getByRole("button", {
-        name: type === "artists" ? "Artists" : "Albums",
-        exact: true,
-      })
-      .click();
+    const choice = page.getByRole("button", {
+      name: type === "artists" ? "Artists" : "Albums",
+      exact: true,
+    });
+    await expect(choice).toHaveAttribute("type", "button");
+    await choice.focus();
+    await expect(choice).toHaveCSS("outline-style", "solid");
+    await page.keyboard.press(type === "artists" ? "Enter" : "Space");
     await expect(
       page.getByRole("button", { name: "Download Collection" }),
     ).toBeVisible({ timeout: 20000 });
@@ -170,7 +183,11 @@ for (const type of ["artists", "tracks"]) {
     await expect(
       page.getByRole("button", { name: "Artists", exact: true }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Log out", exact: true }).click();
+    const logout = page.getByRole("button", { name: "Log out", exact: true });
+    await page.keyboard.press("Tab");
+    await logout.focus();
+    await expect(logout).toHaveCSS("outline-style", "solid");
+    await page.keyboard.press("Enter");
     await expect(
       page.getByRole("link", { name: "Connect with Spotify" }),
     ).toBeVisible();

@@ -21,7 +21,7 @@ type FooterProps = FooterOwnProps & RouterProps;
 
 interface FooterState {
   footerPopoverContent: string;
-  footerPopoverIsOpen: boolean;
+  copyFeedback: string | null;
 }
 
 class Footer extends React.Component<FooterProps, FooterState> {
@@ -32,26 +32,22 @@ class Footer extends React.Component<FooterProps, FooterState> {
 
   override state: FooterState = {
     footerPopoverContent: "Click to copy: spoticulum@ahmeto.com",
-    footerPopoverIsOpen: false,
+    copyFeedback: null,
   };
 
-  handleFooterEmailClick = () => {
-    navigator.clipboard
-      .writeText("spoticulum@ahmeto.com")
-      .then(() => {
-        this.setState({
-          footerPopoverContent: "Copied!",
-        });
-        setTimeout(() => {
-          this.setState({
-            footerPopoverContent: "Click to copy: spoticulum@ahmeto.com",
-            footerPopoverIsOpen: false,
-          });
-        }, 2000);
-      })
-      .catch((error) => {
-        console.error("Error copying text to clipboard:", error);
+  handleFooterEmailClick = async () => {
+    try {
+      if (!navigator.clipboard?.writeText)
+        throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText("spoticulum@ahmeto.com");
+      this.setState({
+        footerPopoverContent: "Copied!",
+        copyFeedback: "Email copied to clipboard.",
       });
+    } catch {
+      const message = "Could not copy. Email: spoticulum@ahmeto.com";
+      this.setState({ footerPopoverContent: message, copyFeedback: message });
+    }
   };
 
   override render() {
@@ -73,6 +69,7 @@ class Footer extends React.Component<FooterProps, FooterState> {
                 </Header>
                 <div style={{ textAlign: "center", fontSize: "1.5em" }}>
                   <a
+                    aria-label="Ahmet Ömer on GitHub"
                     style={{ marginRight: ".6em" }}
                     href="https://github.com/ahmetomerv"
                     target="_blank"
@@ -81,7 +78,7 @@ class Footer extends React.Component<FooterProps, FooterState> {
                     <Icon name="github" />
                   </a>
                   <a
-                    aria-label="X profile"
+                    aria-label="Ahmet Ömer on X"
                     style={{ marginRight: ".6em" }}
                     href="https://x.com/ahmetdotme"
                     target="_blank"
@@ -100,15 +97,19 @@ class Footer extends React.Component<FooterProps, FooterState> {
                     content={this.state.footerPopoverContent}
                     on="hover"
                     trigger={
-                      <a>
-                        <Icon
-                          name="mail"
-                          link={true}
-                          onClick={this.handleFooterEmailClick}
-                        />
-                      </a>
+                      <button
+                        type="button"
+                        className="footer-icon-button"
+                        aria-label="Copy email address"
+                        onClick={this.handleFooterEmailClick}
+                      >
+                        <Icon name="mail" />
+                      </button>
                     }
                   />
+                  <span className="footer-copy-feedback" role="status">
+                    {this.state.copyFeedback}
+                  </span>
                   <Divider className="footer-divider" />
                   <div>
                     <Link className="legal-link" to="/legal">

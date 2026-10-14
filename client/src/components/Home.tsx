@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  Form,
   Image,
   Button,
   Divider,
@@ -29,6 +28,8 @@ interface HomeState {
 }
 
 class Home extends React.Component<RouterProps, HomeState> {
+  private exampleButtonRef = React.createRef<HTMLButtonElement>();
+
   constructor(props: RouterProps) {
     super(props);
     this.handleModal = this.handleModal.bind(this);
@@ -148,9 +149,9 @@ class Home extends React.Component<RouterProps, HomeState> {
               <MainLogo displayLogoTitle={true} />
             </div>
             {user ? (
-              <Form className="request-type-form">
+              <div className="ui form request-type-form">
                 <Segment>
-                  <label>Logged in as:</label>
+                  <span>Logged in as:</span>
                   <br />
                   <br />
                   <Image src={profileUrl} bordered avatar />
@@ -165,28 +166,34 @@ class Home extends React.Component<RouterProps, HomeState> {
                   </span>
                 </Segment>
                 <br />
-                <Form.Field>
-                  <label>Generate based on what you listen to the most:</label>
-                </Form.Field>
-                <Form.Group className="request-type-form-group">
-                  <Button onClick={this.handleTypeChange("artists")}>
+                <div className="field">
+                  <p>Generate based on what you listen to the most:</p>
+                </div>
+                <div className="fields request-type-form-group">
+                  <Button
+                    type="button"
+                    onClick={this.handleTypeChange("artists")}
+                  >
                     Artists
                   </Button>
-                  <Button onClick={this.handleTypeChange("tracks")}>
+                  <Button
+                    type="button"
+                    onClick={this.handleTypeChange("tracks")}
+                  >
                     Albums
                   </Button>
-                </Form.Group>
+                </div>
                 <br />
                 <br />
                 <Divider />
                 <br />
                 <br />
                 <div>
-                  <Button negative onClick={this.handleLogout}>
+                  <Button type="button" negative onClick={this.handleLogout}>
                     Log out
                   </Button>
                 </div>
-              </Form>
+              </div>
             ) : (
               <React.Fragment>
                 <div className="login-info">
@@ -194,12 +201,14 @@ class Home extends React.Component<RouterProps, HomeState> {
                   <Popup
                     content="Click to see example collection"
                     trigger={
-                      <span
+                      <button
+                        type="button"
+                        ref={this.exampleButtonRef}
                         className="example-click"
                         onClick={() => this.handleModal(true)}
                       >
                         visual snapshot
-                      </span>
+                      </button>
                     }
                   />{" "}
                   of your most-listened-to artists and albums.
@@ -217,6 +226,10 @@ class Home extends React.Component<RouterProps, HomeState> {
                 <Modal
                   onClose={() => this.handleModal(false)}
                   onOpen={() => this.handleModal(true)}
+                  onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    this.exampleButtonRef.current?.focus();
+                  }}
                   open={exampleModalOpen}
                 >
                   <ModalHeader>Example:</ModalHeader>
@@ -224,7 +237,11 @@ class Home extends React.Component<RouterProps, HomeState> {
                     <Image size="massive" src={exampleCollectionUrl} wrapped />
                   </ModalContent>
                   <ModalActions>
-                    <Button onClick={() => this.handleModal(false)} positive>
+                    <Button
+                      type="button"
+                      onClick={() => this.handleModal(false)}
+                      positive
+                    >
                       Ok
                     </Button>
                   </ModalActions>

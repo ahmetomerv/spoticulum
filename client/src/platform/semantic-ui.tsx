@@ -3,8 +3,8 @@
  * Vite maps the old import here so domain components and Semantic CSS stay intact.
  */
 import {
-  cloneElement,
   createElement,
+  type ComponentProps,
   type ComponentType,
   type CSSProperties,
   type ElementType,
@@ -239,34 +239,21 @@ export function Loader({
   );
 }
 
-interface TriggerProps {
-  tabIndex?: number;
-  href?: string;
-  role?: string;
-  "aria-label"?: string;
-}
 export function Popup({
   trigger,
   content,
   size,
   on: _on,
 }: {
-  trigger: ReactElement<TriggerProps>;
+  trigger: ReactElement;
   content: ReactNode;
   size?: string;
   on?: string;
 }) {
-  const label = typeof content === "string" ? content : undefined;
-  const triggerElement = cloneElement(trigger, {
-    tabIndex: trigger.props.tabIndex ?? 0,
-    ...(trigger.type === "a" && !trigger.props.href
-      ? { role: "button", "aria-label": label }
-      : {}),
-  });
   return (
     <Tooltip.Provider delayDuration={150}>
       <Tooltip.Root>
-        <Tooltip.Trigger asChild>{triggerElement}</Tooltip.Trigger>
+        <Tooltip.Trigger asChild>{trigger}</Tooltip.Trigger>
         <Tooltip.Portal>
           <Tooltip.Content
             side="top"
@@ -295,11 +282,13 @@ export function Modal({
   open,
   onOpen,
   onClose,
+  onCloseAutoFocus,
   children,
 }: PropsWithChildren<{
   open: boolean;
   onOpen?: () => void;
   onClose?: () => void;
+  onCloseAutoFocus?: ComponentProps<typeof Dialog.Content>["onCloseAutoFocus"];
 }>) {
   return (
     <Dialog.Root
@@ -313,6 +302,7 @@ export function Modal({
         >
           <Dialog.Content
             aria-describedby={undefined}
+            onCloseAutoFocus={onCloseAutoFocus}
             className="ui modal transition visible active"
             style={{
               display: "block",
