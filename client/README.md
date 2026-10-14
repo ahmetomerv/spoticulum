@@ -1,8 +1,9 @@
 # Spoticulum client
 
-TypeScript React 19 single-page application built with Vite. It renders Spotify
-collection images in the browser and communicates with the same-origin Express
-API; Spotify credentials and tokens never belong in client environment values.
+TypeScript React 19 application built with Vite. It renders Spotify collection
+images in the browser and calls the same-origin Express API.
+
+Setup is in the repository README's Quick Start.
 
 ```sh
 npm ci
@@ -14,5 +15,5 @@ npm run build
 npm run test:e2e
 ```
 
-The production bundle is emitted to `build`. `VITE_GA` is the only supported
-public build variable and is optional.
+The production bundle is emitted to `build`. `VITE_GA` is the only public build
+variable and is optional.

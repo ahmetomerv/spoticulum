@@ -2,37 +2,15 @@
 
 Spoticulum is an open-source Spotify collection-image maker. Connect a Spotify account, choose top artists or top tracks, and download a shareable image assembled in the browser.
 
-The app is built with React, Vite, TypeScript, and an Express API. Spotify OAuth
-tokens stay on the server in an HTTP-only session; the client talks to same-origin
-`/api/*` routes and never receives Spotify access or refresh tokens.
+The app is built with React 19, Vite, TypeScript, and Express 5. Spotify OAuth tokens stay on the server in an HTTP-only session; the client talks to same-origin `/api/*` routes and never receives Spotify access or refresh tokens.
 
 ![Spoticulum screenshot](client/public/screenshot.jpeg)
-
-## Tech Stack
-
-- React 19 and Vite
-- TypeScript
-- Express 5
-- Spotify Web API
-- Vitest, Node test runner, and Playwright
-- Docker-ready production build
 
 ## Requirements
 
 - Node `24.21.0` from `.nvmrc`
 - npm `11.x`
 - A Spotify Developer application
-
-Create a Spotify app in the
-[Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and add
-this local redirect URI:
-
-```text
-http://127.0.0.1:8888/api/logged
-```
-
-Use `127.0.0.1`, not `localhost`, so the callback exactly matches the local
-configuration.
 
 ## Quick Start
 
@@ -44,12 +22,20 @@ npm --prefix server ci
 cp server/.env.example server/.env
 ```
 
-Edit `server/.env` with your Spotify credentials:
+Create a Spotify app in the
+[Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and add
+this redirect URI:
 
-```sh
-CLIENT_ID=your-spotify-client-id
-CLIENT_SECRET=your-spotify-client-secret
-SESSION_SECRET=generate-a-long-random-session-secret
+```text
+http://127.0.0.1:8888/api/logged
+```
+
+The callback must be exactly that URL, including `127.0.0.1`.
+
+`server/.env.example` already sets the local URLs. Replace the Spotify
+credential placeholders. Every variable is listed in the table below.
+
+```text
 REDIRECTURI=http://127.0.0.1:8888/api/logged
 CLIENT_REDIRECTURI=http://127.0.0.1:3000/
 ```
@@ -102,19 +88,9 @@ npm run verify
 ```
 
 `npm run verify` runs typecheck, lint, tests, format checks, and the production
-build.
+build. Vitest covers the client, and the Node test runner covers the API.
 
-Useful package-specific commands:
-
-```sh
-npm --prefix client run test:e2e
-npm --prefix client run format:check
-npm --prefix server run format:check
-npm --prefix client audit --audit-level=high
-npm --prefix server audit --audit-level=high
-```
-
-Install Playwright's Chromium browser before the first E2E run:
+Install Playwright's Chromium browser before the first end-to-end run:
 
 ```sh
 cd client
@@ -122,10 +98,17 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-A local E2E run compiles the server before the tests start. In CI, the workflow
-builds the server first and Playwright only starts `server/dist/app.js`. The
-tests use mocked Spotify responses, so they do not require a real Spotify
+A local end-to-end run compiles the server before the tests start. In CI, the
+workflow builds the server first and Playwright only starts `server/dist/app.js`.
+The tests use mocked Spotify responses, so they do not require a real Spotify
 account.
+
+CI fails on high-severity dependency findings:
+
+```sh
+npm --prefix client audit --audit-level=high
+npm --prefix server audit --audit-level=high
+```
 
 ## Production
 
@@ -164,9 +147,7 @@ docker build --build-arg VITE_GA=G-XXXXXXXXXX -t spoticulum .
 
 ## Security and Privacy Notes
 
-- Spotify tokens are stored only in the server session.
-- Session cookies are HTTP-only and signed.
-- Production redirect URLs must use HTTPS and share the same origin.
+- Spotify tokens stay in the HTTP-only server session.
 - CORS only allows the configured app origin and local development origins.
 - The generated image is assembled in the browser and is not uploaded by the app.
 
