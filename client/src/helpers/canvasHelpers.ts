@@ -6,7 +6,7 @@ type LegacyCanvasContext = CanvasRenderingContext2D & {
   backingStorePixelRatio?: number;
 };
 
-export type ImageResultCallback = (status: boolean | Event | string) => void;
+export type ImageResultCallback = (status: "loaded" | "failed") => void;
 
 function getCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
   const context = canvas.getContext("2d");
@@ -98,31 +98,44 @@ export const drawCell = (
   cellSize = 50,
   imgResultCallback?: ImageResultCallback,
 ): void => {
+  if (!imgUrl.trim()) {
+    imgResultCallback?.("failed");
+    return;
+  }
+
   const x = xCell * cellSize;
   const y = yCell * cellSize;
   const img = new Image();
   let opacity = 0;
+  let settled = false;
+  const timeout = setTimeout(() => finish("failed"), 15000);
+
+  function finish(result: Parameters<ImageResultCallback>[0]): void {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timeout);
+    img.onload = null;
+    img.onerror = null;
+    context.globalAlpha = 1;
+    imgResultCallback?.(result);
+  }
 
   img.setAttribute("crossorigin", "");
-  img.onerror = (error) => {
-    console.error(error);
-    imgResultCallback?.(error);
-  };
+  img.onerror = () => finish("failed");
   img.onload = () => {
-    img.id = "canvas-image";
-    document.body.appendChild(img);
-    const tempImg = document.querySelector<HTMLImageElement>("#canvas-image");
-    if (!tempImg) throw new Error("Loaded canvas image was not found");
-    img.width = tempImg.width;
-    img.height = tempImg.height;
-    document.body.removeChild(tempImg);
-
-    const imgSize = Math.min(img.width, img.height);
-    const left = (img.width - imgSize) / 2;
-    const top = (img.height - imgSize) / 2;
-    if (imgUrl.length > 1) {
-      const fadeIn = (): void => {
-        setTimeout(() => {
+    const imageWidth = img.naturalWidth;
+    const imageHeight = img.naturalHeight;
+    const imgSize = Math.min(imageWidth, imageHeight);
+    if (imgSize <= 0) {
+      finish("failed");
+      return;
+    }
+    const left = (imageWidth - imgSize) / 2;
+    const top = (imageHeight - imgSize) / 2;
+    const fadeIn = (): void => {
+      setTimeout(() => {
+        if (settled) return;
+        try {
           context.globalAlpha = opacity;
           context.drawImage(
             img,
@@ -135,13 +148,20 @@ export const drawCell = (
             cellSize - padding * 2,
             cellSize - padding * 2,
           );
-          opacity += 0.1;
-          if (opacity < 1) requestAnimationFrame(fadeIn);
-          else imgResultCallback?.(true);
-        }, 40);
-      };
-      fadeIn();
-    }
+        } catch {
+          finish("failed");
+          return;
+        }
+        opacity += 0.1;
+        if (opacity < 1) requestAnimationFrame(fadeIn);
+        else finish("loaded");
+      }, 40);
+    };
+    fadeIn();
   };
-  img.src = imgUrl;
+  try {
+    img.src = imgUrl;
+  } catch {
+    finish("failed");
+  }
 };

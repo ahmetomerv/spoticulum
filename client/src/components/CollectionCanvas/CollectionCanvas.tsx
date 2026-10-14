@@ -13,8 +13,8 @@ import { trackAnalyticsEvent } from "../../platform/analytics";
 import { spotifyApi } from "../../helpers/spotifyApi";
 import { SpotifyApiError } from "../../helpers/spotifyApi";
 import { getBestSpotifyImageUrl } from "../../helpers/spotifyImages";
+import { createCollectionArtworkPicker } from "../../helpers/collectionArtwork";
 import { Button, Header, Segment } from "semantic-ui-react";
-import type { ImageResultCallback } from "../../helpers/canvasHelpers";
 import type { RouterProps } from "../../types/navigation";
 import type {
   CollectionRequestType,
@@ -26,7 +26,6 @@ import type {
 
 interface CollectionCanvasState {
   collectionIsReady: boolean;
-  imgResults: Array<Parameters<ImageResultCallback>[0]>;
   canvas: HTMLCanvasElement | null;
   timeRange: SpotifyTimeRange;
   isLoading: boolean;
@@ -42,7 +41,6 @@ class CollectionCanvas extends React.Component<
 > {
   override state: CollectionCanvasState = {
     collectionIsReady: false,
-    imgResults: [],
     canvas: null,
     timeRange: "long_term",
     isLoading: false,
@@ -176,29 +174,6 @@ class CollectionCanvas extends React.Component<
       });
   };
 
-  imgLoadCallback: ImageResultCallback = (status) => {
-    this.setState((prevState) => {
-      const updatedImgResults = [...prevState.imgResults, status];
-      const xRowCells = 8;
-      const yRowCells = 8;
-      const profileCells = 4;
-
-      let updatedCollectionIsReady = prevState.collectionIsReady;
-
-      if (
-        updatedImgResults.length >=
-        xRowCells * yRowCells - (profileCells - 1)
-      ) {
-        updatedCollectionIsReady = updatedImgResults.every((x) => x);
-      }
-
-      return {
-        imgResults: updatedImgResults,
-        collectionIsReady: updatedCollectionIsReady,
-      };
-    });
-  };
-
   handleDownloadCollectionClick = () => {
     if (this.state.canvas) {
       downloadCanvasImage(
@@ -214,6 +189,16 @@ class CollectionCanvas extends React.Component<
   };
 
   createSpotifyCollection = () => {
+    const pickArtwork = createCollectionArtworkPicker(this.state.mediaEntities);
+    if (!pickArtwork) {
+      this.setState({
+        error: new Error(
+          "No artwork is available for this collection. Return Home and try the other collection.",
+        ),
+      });
+      return;
+    }
+
     const width = 700;
     const height = 700;
     const cellWidth = 70;
@@ -232,6 +217,63 @@ class CollectionCanvas extends React.Component<
       });
       return;
     }
+    let pendingCells = 0;
+    let drawingScheduledComplete = false;
+    let logoLoaded = false;
+    let failed = false;
+    let finalized = false;
+    const failCollection = (message: string): void => {
+      if (failed || finalized) return;
+      failed = true;
+      this.setState({ error: new Error(message) });
+    };
+    const tryFinalize = (): void => {
+      if (
+        failed ||
+        finalized ||
+        !drawingScheduledComplete ||
+        pendingCells > 0 ||
+        !logoLoaded
+      )
+        return;
+      try {
+        context.globalAlpha = 1;
+        context.drawImage(logo, 70 + padding, height - 60, 30, 30);
+        context.fillStyle = secondGradientColor;
+        context.font = "bold 15px sans-serif";
+        context.fillText("spoticulum.ahmeto.com", 110 + padding, height - 42);
+        context.fillStyle = firstGradientColor;
+        context.font = "bold 15px sans-serif";
+        context.fillText(
+          this.state.user?.display_name || "",
+          width - 185 + padding,
+          height - 42,
+        );
+        finalized = true;
+        this.setState({ collectionIsReady: true });
+      } catch {
+        failCollection(
+          "The collection could not be completed. Return Home and try again.",
+        );
+      }
+    };
+    const drawCollectionCell = (
+      x: number,
+      y: number,
+      imageUrl: string,
+      size: number,
+    ): void => {
+      pendingCells++;
+      drawCell(x, y, null, context, padding, imageUrl, size, (result) => {
+        pendingCells--;
+        if (result === "failed") {
+          failCollection(
+            "An image could not be loaded. Return Home and try again.",
+          );
+        }
+        tryFinalize();
+      });
+    };
     context.lineWidth = 5;
     const padding = context.lineWidth / 6;
     const canvasTarget = document.getElementById("canvas") || document.body;
@@ -286,38 +328,21 @@ class CollectionCanvas extends React.Component<
       "spoticulum-logo.png",
     );
 
-    drawCell(
-      2,
-      2,
-      null,
-      context,
-      padding,
-      profileUrl,
-      profileCellSize,
-      this.imgLoadCallback,
-    );
+    drawCollectionCell(2, 2, profileUrl, profileCellSize);
 
     let canvasLoop: (remainingRows: number) => void;
 
     (canvasLoop = (z: number) => {
       setTimeout(() => {
-        const { mediaEntities } = this.state;
         for (let i = 0; i < stepsToTake; i++) {
           if (stepsToTakeRight !== 0) {
-            const imgUrl = this.getMediaEntityImgUrl(
-              mediaEntities,
-              cellIndexCounter,
-            );
+            const imgUrl = pickArtwork(cellIndexCounter);
 
-            drawCell(
+            drawCollectionCell(
               startingXCell + i,
               startingYCell,
-              null,
-              context,
-              padding,
               imgUrl,
               cellSize,
-              this.imgLoadCallback,
             );
             cellIndexCounter++;
             stepsToTakeRight--;
@@ -329,20 +354,13 @@ class CollectionCanvas extends React.Component<
           }
 
           if (stepsToTakeBottom !== 0 && stepsToTakeRight === 0) {
-            const imgUrl = this.getMediaEntityImgUrl(
-              mediaEntities,
-              cellIndexCounter,
-            );
+            const imgUrl = pickArtwork(cellIndexCounter);
 
-            drawCell(
+            drawCollectionCell(
               rightStepLastCell.x,
               startingYCell + stepCounter,
-              null,
-              context,
-              padding,
               imgUrl,
               cellSize,
-              this.imgLoadCallback,
             );
             cellIndexCounter++;
             stepCounter++;
@@ -356,20 +374,13 @@ class CollectionCanvas extends React.Component<
           }
 
           if (stepsToTakeLeft !== 0 && stepsToTakeBottom === 0) {
-            const imgUrl = this.getMediaEntityImgUrl(
-              mediaEntities,
-              cellIndexCounter,
-            );
+            const imgUrl = pickArtwork(cellIndexCounter);
 
-            drawCell(
+            drawCollectionCell(
               bottomStepLastCell.x + stepCounter,
               bottomStepLastCell.y,
-              null,
-              context,
-              padding,
               imgUrl,
               cellSize,
-              this.imgLoadCallback,
             );
             cellIndexCounter++;
             stepCounter--;
@@ -383,20 +394,13 @@ class CollectionCanvas extends React.Component<
           }
 
           if (stepsToTakeTop !== 0 && stepsToTakeLeft === 0) {
-            const imgUrl = this.getMediaEntityImgUrl(
-              mediaEntities,
-              cellIndexCounter,
-            );
+            const imgUrl = pickArtwork(cellIndexCounter);
 
-            drawCell(
+            drawCollectionCell(
               leftStepLastCell.x,
               leftStepLastCell.y - stepCounter,
-              null,
-              context,
-              padding,
               imgUrl,
               cellSize,
-              this.imgLoadCallback,
             );
             cellIndexCounter++;
             stepCounter++;
@@ -432,46 +436,31 @@ class CollectionCanvas extends React.Component<
           }
         }
         if (--z) canvasLoop(z);
+        else {
+          drawingScheduledComplete = true;
+          tryFinalize();
+        }
       }, 900);
     })(rowsCount);
 
     const logo = new Image();
-    logo.src = "spoticulum-logo.png";
+    const logoTimeout = setTimeout(() => {
+      failCollection(
+        "The collection logo could not be loaded. Return Home and try again.",
+      );
+    }, 15000);
     logo.onload = () => {
-      context.drawImage(logo, 70 + padding, height - 60, 30, 30);
-
-      context.fillStyle = secondGradientColor;
-      context.font = "bold 15px sans-serif";
-      context.fillText("spoticulum.ahmeto.com", 110 + padding, height - 42);
-
-      context.fillStyle = firstGradientColor;
-      context.font = "bold 15px sans-serif";
-      context.fillText(
-        this.state.user?.display_name || "",
-        width - 185 + padding,
-        height - 42,
+      clearTimeout(logoTimeout);
+      logoLoaded = true;
+      tryFinalize();
+    };
+    logo.onerror = () => {
+      clearTimeout(logoTimeout);
+      failCollection(
+        "The collection logo could not be loaded. Return Home and try again.",
       );
     };
-  };
-
-  getMediaEntityImgUrl = (
-    mediaEntities: MediaEntity[],
-    index: number,
-  ): string =>
-    getBestSpotifyImageUrl(mediaEntities[index]?.images) ||
-    this.getRandomMediaEntityImgUrl(mediaEntities);
-
-  getRandomMediaEntityImgUrl = (mediaEntities: MediaEntity[]): string => {
-    if (mediaEntities.length) {
-      const randomNum = Math.floor(Math.random() * mediaEntities.length);
-      const randomEntity = mediaEntities[randomNum];
-      return (
-        getBestSpotifyImageUrl(randomEntity?.images) ||
-        this.getRandomMediaEntityImgUrl(mediaEntities)
-      );
-    }
-
-    return "";
+    logo.src = "spoticulum-logo.png";
   };
 
   override render() {
@@ -482,7 +471,7 @@ class CollectionCanvas extends React.Component<
         <div className="canvas-container">
           <div className="canvas-content">
             <Header as="h1" block attached="top">
-              Spotify session problem
+              Couldn't create your collection
             </Header>
             <Segment attached>
               <p>{error.message}</p>
