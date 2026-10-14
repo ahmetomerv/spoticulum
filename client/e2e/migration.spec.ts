@@ -149,9 +149,25 @@ for (const type of ["artists", "tracks"]) {
     await choice.focus();
     await expect(choice).toHaveCSS("outline-style", "solid");
     await page.keyboard.press(type === "artists" ? "Enter" : "Space");
+    await expect(page.locator(".collection-status")).toHaveText(
+      `Creating your ${type === "artists" ? "artists" : "albums"} collection.`,
+    );
     await expect(
       page.getByRole("button", { name: "Download Collection" }),
     ).toBeVisible({ timeout: 20000 });
+    await expect(page.locator(".collection-status")).toHaveText(
+      `Your ${type === "artists" ? "artists" : "albums"} collection is ready. Download Collection and Go Back are available.`,
+    );
+    const artworkList = page.getByRole("list", {
+      name:
+        type === "artists"
+          ? "Artists whose artwork appears"
+          : "Albums represented by your top tracks",
+    });
+    await expect(artworkList.getByRole("listitem")).toHaveCount(100);
+    await expect(artworkList.getByRole("listitem").first()).toHaveText(
+      type === "artists" ? "Artist 0" : "Album 0",
+    );
     await expect(
       page.getByRole("heading", {
         name: type === "artists" ? /Your top artists/ : /Your top albums/,
@@ -472,7 +488,10 @@ test("a failed artwork request cannot enable download", async ({ page }) => {
   );
 
   await page.goto("/collection?collection_request_type=artists");
-  await expect(page.getByText(/An image could not be loaded/)).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(
+    /An image could not be loaded/,
+  );
+  await expect(page.getByRole("button", { name: "Home" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Download Collection" }),
   ).toHaveCount(0);

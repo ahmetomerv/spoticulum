@@ -251,7 +251,9 @@ class CollectionCanvas extends React.Component<
     const context = canvas.getContext("2d");
     if (!context) {
       this.setState({
-        error: new Error("Canvas rendering is not supported by this browser."),
+        error: new Error(
+          "Canvas rendering is not supported by this browser. Return Home and try another browser.",
+        ),
       });
       return;
     }
@@ -529,7 +531,26 @@ class CollectionCanvas extends React.Component<
   };
 
   override render() {
-    const { collectionIsReady, emptyReason, error } = this.state;
+    const {
+      collectionIsReady,
+      collectionRequestType,
+      emptyReason,
+      error,
+      mediaEntities,
+    } = this.state;
+    const collectionName =
+      collectionRequestType === "tracks" ? "albums" : "artists";
+    const artworkLabels = Array.from(
+      new Set(
+        mediaEntities
+          .filter((entity) =>
+            getBestSpotifyImageUrl(
+              entity.images.filter((image) => image.url.trim()),
+            ),
+          )
+          .map((entity) => entity.label),
+      ),
+    );
 
     if (error) {
       return (
@@ -539,8 +560,15 @@ class CollectionCanvas extends React.Component<
               Couldn't create your collection
             </Header>
             <Segment attached>
-              <p>{error.message}</p>
-              <Button onClick={() => this.props.navigate("/")}>Home</Button>
+              <div role="alert">
+                <p>{error.message}</p>
+                {!/return home/i.test(error.message) && (
+                  <p>Return Home and try again.</p>
+                )}
+              </div>
+              <Button type="button" onClick={() => this.props.navigate("/")}>
+                Home
+              </Button>
             </Segment>
           </div>
         </div>
@@ -548,8 +576,6 @@ class CollectionCanvas extends React.Component<
     }
 
     if (emptyReason) {
-      const collectionName =
-        this.state.collectionRequestType === "tracks" ? "albums" : "artists";
       return (
         <div className="canvas-container">
           <div className="canvas-content">
@@ -559,12 +585,14 @@ class CollectionCanvas extends React.Component<
                 : "No artwork to show"}
             </Header>
             <Segment attached>
-              <p>
+              <p role="status">
                 {emptyReason === "no-results"
                   ? `Spotify returned no top ${collectionName} for this period. Return Home and try the other collection.`
                   : `No artwork is available for these ${collectionName}. Return Home and try the other collection.`}
               </p>
-              <Button onClick={() => this.props.navigate("/")}>Home</Button>
+              <Button type="button" onClick={() => this.props.navigate("/")}>
+                Home
+              </Button>
             </Segment>
           </div>
         </div>
@@ -575,7 +603,16 @@ class CollectionCanvas extends React.Component<
       <React.Fragment>
         <div className="canvas-container">
           <div className="canvas-content">
-            <Header as="h1" block attached="top">
+            <Header
+              as="h1"
+              block
+              attached="top"
+              aria-label={
+                collectionRequestType
+                  ? `Your top ${collectionName}`
+                  : "Your collection"
+              }
+            >
               &#128189; Your top{" "}
               {this.state.collectionRequestType === "tracks"
                 ? "albums"
@@ -592,7 +629,42 @@ class CollectionCanvas extends React.Component<
               </p>
             </Header>
             <Segment attached>
-              <div id="canvas"></div>
+              <p
+                className="collection-sr-only collection-status"
+                role="status"
+                aria-atomic="true"
+              >
+                {collectionRequestType
+                  ? collectionIsReady
+                    ? `Your ${collectionName} collection is ready. Download Collection and Go Back are available.`
+                    : `Creating your ${collectionName} collection.`
+                  : ""}
+              </p>
+              {artworkLabels.length > 0 && (
+                <div className="collection-sr-only">
+                  <p>
+                    A square collage of{" "}
+                    {collectionRequestType === "tracks" ? "album" : "artist"}{" "}
+                    artwork from your top{" "}
+                    {collectionRequestType === "tracks" ? "tracks" : "artists"}{" "}
+                    over the last year, with a profile image or default logo and
+                    Spoticulum branding. Tiles may repeat when some Spotify
+                    items have no artwork.
+                  </p>
+                  <h2 id="collection-artwork-heading">
+                    {collectionRequestType === "tracks"
+                      ? "Albums represented by your top tracks"
+                      : "Artists whose artwork appears"}
+                  </h2>
+                  <ul aria-labelledby="collection-artwork-heading">
+                    {artworkLabels.map((label) => (
+                      <li key={label}>{label}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {/* The static artwork list is the screen-reader equivalent of this visual canvas. */}
+              <div id="canvas" aria-hidden="true"></div>
               <div className="canvas-actions-container">
                 {collectionIsReady ? (
                   <React.Fragment>
@@ -611,6 +683,7 @@ class CollectionCanvas extends React.Component<
                 ) : (
                   <Button
                     disabled
+                    aria-hidden="true"
                     className="button loading-button"
                     basic
                     loading

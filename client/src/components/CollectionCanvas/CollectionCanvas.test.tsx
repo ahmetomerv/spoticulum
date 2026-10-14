@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
@@ -137,6 +137,9 @@ test("an empty top list stops pagination and offers a way home", async () => {
     await screen.findByRole("heading", { name: "No collection data yet" }),
   ).toBeVisible();
   expect(screen.getByText(/no top artists/i)).toBeVisible();
+  expect(screen.getByRole("status")).toHaveTextContent(
+    /Return Home and try the other collection/,
+  );
   expect(
     screen.queryByRole("button", { name: "Download Collection" }),
   ).toBeNull();
@@ -161,8 +164,90 @@ test("malformed top-list JSON shows a controlled error", async () => {
   expect(
     await screen.findByText(/Invalid Spotify collection data/),
   ).toBeVisible();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    /Return Home and try again/,
+  );
   expect(screen.getByRole("button", { name: "Home" })).toBeVisible();
   expect(
     screen.queryByRole("button", { name: "Download Collection" }),
   ).toBeNull();
+});
+
+test("a collection request failure announces an action to take", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/me")
+        return Response.json({
+          id: "listener",
+          display_name: "Listener",
+          images: [],
+        });
+      throw new Error("Network unavailable");
+    }),
+  );
+
+  renderCollection();
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent("Network unavailable");
+  expect(alert).toHaveTextContent("Return Home and try again.");
+  expect(screen.getByRole("button", { name: "Home" })).toBeVisible();
+});
+
+test("exposes artwork names and one collection loading status", async () => {
+  const gradient = { addColorStop: vi.fn() };
+  const context = {
+    setTransform: vi.fn(),
+    createLinearGradient: () => gradient,
+    fillRect: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    lineWidth: 5,
+  } as unknown as CanvasRenderingContext2D;
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(
+    () => context,
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) =>
+      Response.json(
+        String(input) === "/api/me"
+          ? { id: "listener", display_name: "Listener", images: [] }
+          : {
+              items: [
+                { id: "one", name: "Artist One", images: [{ url: "one.png" }] },
+                { id: "two", name: "Artist Two", images: [] },
+              ],
+              next: null,
+            },
+      ),
+    ),
+  );
+
+  renderCollection();
+  await waitFor(() =>
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Creating your artists collection.",
+    ),
+  );
+  const artworkList = await screen.findByRole("list", {
+    name: "Artists whose artwork appears",
+  });
+  expect(
+    screen.getByRole("heading", { name: "Your top artists" }),
+  ).toBeVisible();
+  expect(
+    screen.getByText(/A square collage of artist artwork/),
+  ).toBeInTheDocument();
+  expect(within(artworkList).getAllByRole("listitem")).toHaveLength(1);
+  expect(artworkList).toHaveTextContent("Artist One");
+  expect(artworkList).not.toHaveTextContent("Artist Two");
+  expect(document.querySelector("#canvas")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Download Collection" }),
+  ).not.toBeInTheDocument();
 });
