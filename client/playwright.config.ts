@@ -18,8 +18,9 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command:
-        "npm --prefix ../server run build:server && node ../server/dist/app.js",
+      command: process.env.CI
+        ? "node ../server/dist/app.js"
+        : "npm --prefix ../server run build:server && node ../server/dist/app.js",
       env: {
         NODE_ENV: "production",
         PORT: "3101",

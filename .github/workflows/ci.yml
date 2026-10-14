@@ -16,18 +16,29 @@ jobs:
           cache-dependency-path: |
             client/package-lock.json
             server/package-lock.json
-      - run: npm --prefix client ci
-      - run: npm --prefix server ci
-      - run: npm --prefix client run lint
-      - run: npm --prefix server run lint
-      - run: npm --prefix client run format:check
-      - run: npm --prefix server run format:check
-      - run: npm --prefix client test
-      - run: npm --prefix server test
-      - run: npm --prefix client run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install dependencies
+        run: |
+          npm --prefix client ci
+          npm --prefix server ci
+      - name: Lint
+        run: npm run lint
+      - name: Check formatting
+        run: npm run format:check
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit and API tests
+        run: npm test
+      - name: Build client
+        run: npm --prefix client run build
+      - name: Build server
+        run: npm --prefix server run build:server
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
         working-directory: client
-      - run: npm run test:e2e
+      - name: End-to-end tests
+        run: npm run test:e2e
         working-directory: client
-      - run: npm --prefix client audit --audit-level=high
-      - run: npm --prefix server audit --audit-level=high
+      - name: Audit dependencies
+        run: |
+          npm --prefix client audit --audit-level=high
+          npm --prefix server audit --audit-level=high
