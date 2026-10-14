@@ -26,11 +26,11 @@ test("a direct legal load announces the page until the terms are ready", async (
   page,
 }) => {
   await page.route(/\/Legal[.-]/, async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     await route.continue();
   });
 
-  await page.goto("/legal");
+  await page.goto("/legal", { waitUntil: "commit" });
   await expect(
     page.getByRole("status", { name: "Loading page" }),
   ).toBeVisible();
@@ -39,6 +39,9 @@ test("a direct legal load announces the page until the terms are ready", async (
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByText(/Spoticulum is an independent service/),
+    page.getByRole("heading", { name: "Terms of Service", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Privacy Policy", exact: true }),
   ).toBeVisible();
 });

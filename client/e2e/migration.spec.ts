@@ -66,7 +66,10 @@ test("home, popup, example modal, Escape, and legal deep link", async ({
   await expect(page).toHaveURL(/\/legal$/);
   await page.reload();
   await expect(
-    page.getByText(/Spoticulum is an independent service/),
+    page.getByRole("heading", { name: "Terms of Service", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Privacy Policy", exact: true }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });

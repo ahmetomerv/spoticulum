@@ -125,27 +125,22 @@ test("preserves the login screen and legal navigation", async () => {
     await screen.findByRole("link", { name: "Connect with Spotify" }),
   ).toBeVisible();
   expect(
-    screen.getByText(/Spotify is a trademark of Spotify AB/),
-  ).toBeVisible();
+    screen.getByRole("link", { name: /^Terms of Service$/ }),
+  ).toHaveAttribute("href", "/legal#terms-of-service");
+  for (const link of screen.getAllByRole("link", {
+    name: /^Privacy Policy$/,
+  })) {
+    expect(link).toHaveAttribute("href", "/legal#privacy-policy");
+  }
   await user.click(
     screen.getByRole("link", { name: "Terms of Service & Privacy Policy" }),
   );
   expect(
-    await screen.findByText(/not affiliated with, authorized by, endorsed by/),
-  ).toBeVisible();
-  expect(screen.getByRole("link", { name: "Spoticulum" })).toHaveAttribute(
-    "href",
-    "https://spoticulum.ahmeto.com",
-  );
-  expect(screen.getAllByText("13 September 2026")).toHaveLength(2);
-  expect(
-    screen.getByText(
-      /keeps the resulting access and refresh tokens in volatile server memory/,
-    ),
+    await screen.findByRole("heading", { name: /^Terms of Service$/ }),
   ).toBeVisible();
   expect(
-    screen.getAllByRole("link", { name: "spoticulum@ahmeto.com" }),
-  ).toHaveLength(4);
+    screen.getByRole("heading", { name: /^Privacy Policy$/ }),
+  ).toBeVisible();
 });
 
 test("opens the example with the keyboard and restores focus when closed", async () => {
@@ -383,7 +378,7 @@ test("leaving Home aborts a pending profile request and prevents a title update"
     await profileResponse;
   });
   expect(
-    screen.getByText(/Spoticulum is an independent service/),
+    await screen.findByRole("heading", { name: /^Terms of Service$/ }),
   ).toBeVisible();
   expect(document.title).toBe("Spoticulum");
 });

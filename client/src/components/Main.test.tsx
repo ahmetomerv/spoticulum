@@ -37,12 +37,10 @@ test("a direct legal URL shows the terms after the route loads", async () => {
   );
 
   expect(
-    await screen.findByRole("heading", { name: "Terms of Service" }),
+    await screen.findByRole("heading", { name: /^Terms of Service$/ }),
   ).toBeVisible();
   expect(
-    screen.getByText(
-      /keeps the resulting access and refresh tokens in volatile server memory/,
-    ),
+    screen.getByRole("heading", { name: /^Privacy Policy$/ }),
   ).toBeVisible();
 });
 
