@@ -193,6 +193,20 @@ body {
 	margin: .35em 0 0;
 }
 
+.analytics-consent h2 {
+	margin: 0;
+	font-size: 1em;
+	font-weight: 700;
+}
+
+.analytics-consent h2:focus-visible,
+.analytics-consent a:focus-visible,
+.analytics-consent button:focus-visible,
+.legal-container h1:focus-visible {
+	outline: 3px solid #236b46;
+	outline-offset: 3px;
+}
+
 .analytics-consent-actions {
 	display: flex;
 	gap: .75em;

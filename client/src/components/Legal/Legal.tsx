@@ -21,6 +21,7 @@ class Legal extends React.Component<Record<string, never>> {
         if (target) {
           const top = target.getBoundingClientRect().top + window.scrollY;
           window.scrollTo(0, top);
+          target.querySelector("h1")?.focus({ preventScroll: true });
           window.history.replaceState(
             window.history.state,
             "",
@@ -40,7 +41,7 @@ class Legal extends React.Component<Record<string, never>> {
     return (
       <main className="legal-container">
         <section id="terms-of-service">
-          <h1>Terms of Service</h1>
+          <h1 tabIndex={-1}>Terms of Service</h1>
           <p>
             Last updated and effective:{" "}
             <time dateTime="2026-09-13">13 September 2026</time>
@@ -184,7 +185,7 @@ class Legal extends React.Component<Record<string, never>> {
         </section>
 
         <section id="privacy-policy">
-          <h1>Privacy Policy</h1>
+          <h1 tabIndex={-1}>Privacy Policy</h1>
           <p>
             Last updated and effective:{" "}
             <time dateTime="2026-09-13">13 September 2026</time>

@@ -1,10 +1,29 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, expect, test, vi } from "vitest";
+import ReactGA from "react-ga4";
 import App from "./App";
+import {
+  ANALYTICS_CONSENT_KEY,
+  trackAnalyticsEvent,
+} from "./platform/analytics";
+
+vi.mock("react-ga4", () => ({
+  default: {
+    isInitialized: false,
+    gtag: vi.fn(),
+    initialize: vi.fn(),
+    event: vi.fn(),
+  },
+}));
 
 beforeEach(() => {
+  window.localStorage.clear();
+  ReactGA.isInitialized = false;
+  vi.mocked(ReactGA.initialize).mockImplementation(() => {
+    ReactGA.isInitialized = true;
+  });
   window.history.replaceState({}, "", "/");
   document.title = "Spoticulum";
   vi.stubGlobal(
@@ -13,6 +32,79 @@ beforeEach(() => {
       Response.json({ error: "Not authenticated" }, { status: 401 }),
     ),
   );
+});
+
+test("new visitors can reach both choices in a non-modal analytics notice", async () => {
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <App analyticsMeasurementId="G-TEST" />
+    </MemoryRouter>,
+  );
+
+  expect(screen.queryByRole("dialog", { name: /analytics/i })).toBeNull();
+  const notice = screen.getByRole("region", { name: "Optional analytics" });
+  expect(notice).toBeVisible();
+  expect(
+    screen.getByRole("heading", { name: "Optional analytics" }),
+  ).toHaveFocus();
+  expect(window.localStorage.getItem(ANALYTICS_CONSENT_KEY)).toBeNull();
+  expect(ReactGA.initialize).not.toHaveBeenCalled();
+
+  await user.tab();
+  expect(
+    within(notice).getByRole("link", { name: "Privacy Policy" }),
+  ).toHaveFocus();
+  await user.tab();
+  expect(screen.getByRole("button", { name: "Decline" })).toHaveFocus();
+  await user.tab();
+  expect(screen.getByRole("button", { name: "Allow analytics" })).toHaveFocus();
+  await user.keyboard("{Enter}");
+
+  expect(
+    screen.queryByRole("region", { name: "Optional analytics" }),
+  ).toBeNull();
+  expect(window.localStorage.getItem(ANALYTICS_CONSENT_KEY)).toBe("granted");
+  expect(ReactGA.initialize).toHaveBeenCalledOnce();
+  expect(
+    screen.getByRole("button", { name: "Privacy settings" }),
+  ).toHaveFocus();
+});
+
+test("withdrawing consent from Privacy settings restores focus and stops events", async () => {
+  window.localStorage.setItem(ANALYTICS_CONSENT_KEY, "granted");
+  const user = userEvent.setup();
+  render(
+    <MemoryRouter>
+      <App analyticsMeasurementId="G-TEST" />
+    </MemoryRouter>,
+  );
+
+  const settings = screen.getByRole("button", { name: "Privacy settings" });
+  expect(
+    screen.queryByRole("region", { name: "Optional analytics" }),
+  ).toBeNull();
+  expect(ReactGA.initialize).toHaveBeenCalledOnce();
+
+  settings.focus();
+  await user.keyboard("{Enter}");
+  const notice = screen.getByRole("region", { name: "Optional analytics" });
+  expect(
+    screen.getByRole("heading", { name: "Optional analytics" }),
+  ).toHaveFocus();
+  await user.tab();
+  expect(
+    within(notice).getByRole("link", { name: "Privacy Policy" }),
+  ).toHaveFocus();
+  await user.tab();
+  expect(screen.getByRole("button", { name: "Decline" })).toHaveFocus();
+  await user.keyboard("{Enter}");
+
+  expect(window.localStorage.getItem(ANALYTICS_CONSENT_KEY)).toBe("denied");
+  expect(window[`ga-disable-G-TEST`]).toBe(true);
+  expect(settings).toHaveFocus();
+  trackAnalyticsEvent({ category: "main", action: "download" });
+  expect(ReactGA.event).not.toHaveBeenCalled();
 });
 
 const signedInProfile = {

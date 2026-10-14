@@ -12,30 +12,45 @@ import {
 const googleAnalyticsId = process.env.REACT_APP_GA;
 type AnalyticsConsent = "granted" | "denied";
 
+interface AppProps {
+  analyticsMeasurementId?: string;
+}
+
 interface AppState {
   showAnalyticsConsent: boolean;
 }
 
-class App extends React.Component<Record<string, never>, AppState> {
+class App extends React.Component<AppProps, AppState> {
+  private readonly analyticsMeasurementId =
+    this.props.analyticsMeasurementId ?? googleAnalyticsId;
+  private readonly consentHeading = React.createRef<HTMLHeadingElement>();
+  private readonly privacySettingsButton = React.createRef<HTMLButtonElement>();
+
   override state: AppState = {
     showAnalyticsConsent:
-      Boolean(googleAnalyticsId) && getAnalyticsConsent() === null,
+      Boolean(this.analyticsMeasurementId) && getAnalyticsConsent() === null,
   };
 
   override componentDidMount() {
-    if (getAnalyticsConsent() === "granted") enableAnalytics(googleAnalyticsId);
-    else disableAnalytics(googleAnalyticsId);
+    if (getAnalyticsConsent() === "granted")
+      enableAnalytics(this.analyticsMeasurementId);
+    else disableAnalytics(this.analyticsMeasurementId);
+    if (this.state.showAnalyticsConsent) this.consentHeading.current?.focus();
   }
 
   handleAnalyticsChoice = (choice: AnalyticsConsent) => {
     setAnalyticsConsent(choice);
-    if (choice === "granted") enableAnalytics(googleAnalyticsId);
-    else disableAnalytics(googleAnalyticsId);
-    this.setState({ showAnalyticsConsent: false });
+    if (choice === "granted") enableAnalytics(this.analyticsMeasurementId);
+    else disableAnalytics(this.analyticsMeasurementId);
+    this.setState({ showAnalyticsConsent: false }, () => {
+      this.privacySettingsButton.current?.focus();
+    });
   };
 
   openAnalyticsSettings = () => {
-    this.setState({ showAnalyticsConsent: true });
+    this.setState({ showAnalyticsConsent: true }, () => {
+      this.consentHeading.current?.focus();
+    });
   };
 
   override render() {
@@ -43,17 +58,23 @@ class App extends React.Component<Record<string, never>, AppState> {
       <div className="top-container">
         <Main />
         <Footer
-          analyticsAvailable={Boolean(googleAnalyticsId)}
+          analyticsAvailable={Boolean(this.analyticsMeasurementId)}
           onOpenPrivacySettings={this.openAnalyticsSettings}
+          privacySettingsRef={this.privacySettingsButton}
         />
         {this.state.showAnalyticsConsent && (
-          <aside
+          <section
             className="analytics-consent"
-            role="dialog"
-            aria-label="Analytics privacy choice"
+            aria-labelledby="analytics-consent-heading"
           >
             <div>
-              <strong>Optional analytics</strong>
+              <h2
+                id="analytics-consent-heading"
+                ref={this.consentHeading}
+                tabIndex={-1}
+              >
+                Optional analytics
+              </h2>
               <p>
                 Allow Google Analytics to help us understand site usage. It
                 stays off unless you agree. See the{" "}
@@ -75,7 +96,7 @@ class App extends React.Component<Record<string, never>, AppState> {
                 Allow analytics
               </button>
             </div>
-          </aside>
+          </section>
         )}
       </div>
     );

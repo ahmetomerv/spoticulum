@@ -34,7 +34,10 @@ export default defineConfig({
     {
       command:
         "node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 3100 --strictPort",
-      env: { VITE_API_PROXY: "http://127.0.0.1:3101" },
+      env: {
+        VITE_API_PROXY: "http://127.0.0.1:3101",
+        VITE_GA: "G-PLAYWRIGHT",
+      },
       url: "http://127.0.0.1:3100",
     },
   ],

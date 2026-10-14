@@ -15,6 +15,7 @@ import type { RouterProps } from "../types/navigation";
 interface FooterOwnProps {
   analyticsAvailable: boolean;
   onOpenPrivacySettings: () => void;
+  privacySettingsRef: React.Ref<HTMLButtonElement>;
 }
 
 type FooterProps = FooterOwnProps & RouterProps;
@@ -119,6 +120,7 @@ class Footer extends React.Component<FooterProps, FooterState> {
                       <button
                         className="privacy-settings-link"
                         type="button"
+                        ref={this.props.privacySettingsRef}
                         onClick={this.props.onOpenPrivacySettings}
                       >
                         Privacy settings
