@@ -10,7 +10,7 @@ class MainLogo extends React.Component<MainLogoProps> {
       <React.Fragment>
         <img
           className="spoticulum-logo"
-          width="100"
+          width="200"
           src="spoticulum-logo.png"
           alt="Spoticulum logo"
         />
