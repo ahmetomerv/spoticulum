@@ -231,18 +231,22 @@ class CollectionCanvas extends React.Component<
 
   createSpotifyCollection = () => {
     if (this.disposed) return;
-    const pickArtwork = createCollectionArtworkPicker(this.state.mediaEntities);
-    if (!pickArtwork) {
-      this.setState({ emptyReason: "no-artwork" });
-      return;
-    }
-
     const width = 700;
     const height = 700;
     const cellWidth = 70;
     const cellHeight = 70;
     const cellSize = (cellWidth + cellHeight) / 2;
     const profileCellSize = cellSize * 2;
+    const pixelRatio = window.devicePixelRatio || 1;
+    const pickArtwork = createCollectionArtworkPicker(
+      this.state.mediaEntities,
+      Math.random,
+      Math.ceil(cellSize * pixelRatio),
+    );
+    if (!pickArtwork) {
+      this.setState({ emptyReason: "no-artwork" });
+      return;
+    }
     const totalCells = (width / cellSize) * (height / cellSize);
     const rowsCount = 3;
     const canvas = createHiDPICanvas(width, height);
@@ -380,6 +384,7 @@ class CollectionCanvas extends React.Component<
     const profileUrl = getBestSpotifyImageUrl(
       this.state.user?.images,
       "spoticulum-logo.png",
+      Math.ceil(profileCellSize * pixelRatio),
     );
 
     drawCollectionCell(2, 2, profileUrl, profileCellSize);

@@ -26,3 +26,23 @@ test("keeps artwork order and reuses only usable images for missing cells", () =
   expect(pick?.(2)).toBe("third.png");
   expect(pick?.(99)).toBe("first.png");
 });
+
+test("picks the smallest artwork that covers the cell", () => {
+  const pick = createCollectionArtworkPicker(
+    [
+      {
+        id: "one",
+        label: "One",
+        images: [
+          { url: "small.jpeg", width: 64, height: 64 },
+          { url: "medium.jpeg", width: 300, height: 300 },
+          { url: "large.jpeg", width: 640, height: 640 },
+        ],
+      },
+    ],
+    () => 0,
+    140,
+  );
+
+  expect(pick?.(0)).toBe("medium.jpeg");
+});
