@@ -308,3 +308,120 @@ test("a Spotify rate limit is shown instead of treating the response as collecti
   ).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
+
+test("a collection without usable artwork shows an actionable error", async ({
+  page,
+}) => {
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      json: { id: "listener", display_name: "Test Listener", images: [] },
+    }),
+  );
+  await page.route("**/api/top/**", (route) =>
+    route.fulfill({
+      json: {
+        items: Array.from({ length: 50 }, (_, index) => ({
+          id: `artist-${index}`,
+          images: [],
+        })),
+        next: null,
+      },
+    }),
+  );
+
+  await page.goto("/collection?collection_request_type=artists");
+  await expect(page.getByText(/No artwork is available/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Download Collection" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Home" })).toBeVisible();
+});
+
+test("missing artwork reuses available art and waits for the logo before download", async ({
+  page,
+}) => {
+  const image =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luzk6QAAAABJRU5ErkJggg==";
+  let releaseLogo: () => void = () => {};
+  let reportLogoRequested: () => void = () => {};
+  const logoAllowed = new Promise<void>((resolve) => {
+    releaseLogo = resolve;
+  });
+  const logoRequested = new Promise<void>((resolve) => {
+    reportLogoRequested = resolve;
+  });
+  await page.route("**/spoticulum-logo.png", async (route) => {
+    reportLogoRequested();
+    await logoAllowed;
+    await route.continue();
+  });
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      json: {
+        id: "listener",
+        display_name: "Test Listener",
+        images: [{ url: image }],
+      },
+    }),
+  );
+  await page.route("**/api/top/**", (route) =>
+    route.fulfill({
+      json: {
+        items: Array.from({ length: 50 }, (_, index) => ({
+          id: `artist-${index}`,
+          images: index === 0 ? [{ url: image }] : [],
+        })),
+        next: null,
+      },
+    }),
+  );
+
+  try {
+    await page.goto("/collection?collection_request_type=artists");
+    await logoRequested;
+    await page.waitForTimeout(5000);
+    await expect(
+      page.getByRole("button", { name: "Download Collection" }),
+    ).toHaveCount(0);
+  } finally {
+    releaseLogo();
+  }
+  await expect(
+    page.getByRole("button", { name: "Download Collection" }),
+  ).toBeVisible({ timeout: 20000 });
+  await expect(page.locator("#canvas canvas")).toHaveCount(1);
+});
+
+test("a failed artwork request cannot enable download", async ({ page }) => {
+  const image =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luzk6QAAAABJRU5ErkJggg==";
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      json: {
+        id: "listener",
+        display_name: "Test Listener",
+        images: [{ url: image }],
+      },
+    }),
+  );
+  await page.route("**/api/top/**", (route) =>
+    route.fulfill({
+      json: {
+        items: Array.from({ length: 50 }, (_, index) => ({
+          id: `artist-${index}`,
+          images: [{ url: "http://127.0.0.1:3101/broken-artwork.png" }],
+        })),
+        next: null,
+      },
+    }),
+  );
+  await page.route("**/broken-artwork.png", (route) =>
+    route.fulfill({ status: 404, body: "" }),
+  );
+
+  await page.goto("/collection?collection_request_type=artists");
+  await expect(page.getByText(/An image could not be loaded/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Download Collection" }),
+  ).toHaveCount(0);
+});
