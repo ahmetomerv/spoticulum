@@ -33,7 +33,10 @@ export async function spotifyApi<T = unknown>(
 
   if (response.status === 204) return null as T;
 
-  const data = (await response.json().catch(() => ({}))) as SpotifyErrorBody;
+  const data = (await response.json().catch((error: unknown) => {
+    if (options.signal?.aborted) throw error;
+    return {};
+  })) as SpotifyErrorBody;
   if (!response.ok) {
     throw new SpotifyApiError(
       data.error || "Spotify request failed",

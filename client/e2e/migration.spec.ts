@@ -425,3 +425,97 @@ test("a failed artwork request cannot enable download", async ({ page }) => {
     page.getByRole("button", { name: "Download Collection" }),
   ).toHaveCount(0);
 });
+
+test("leaving during image loading stops old drawing and returning creates one collection", async ({
+  page,
+}) => {
+  const image =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/luzk6QAAAABJRU5ErkJggg==";
+  await page.addInitScript(() => {
+    const originalDrawImage = CanvasRenderingContext2D.prototype.drawImage;
+    const metrics = window as Window & { collectionDraws?: number };
+    metrics.collectionDraws = 0;
+    CanvasRenderingContext2D.prototype.drawImage = function (
+      this: CanvasRenderingContext2D,
+      ...args: unknown[]
+    ) {
+      metrics.collectionDraws = (metrics.collectionDraws || 0) + 1;
+      return Reflect.apply(originalDrawImage, this, args);
+    };
+  });
+  let releaseArtwork: () => void = () => {};
+  let reportArtworkRequested: () => void = () => {};
+  const artworkAllowed = new Promise<void>((resolve) => {
+    releaseArtwork = resolve;
+  });
+  const artworkRequested = new Promise<void>((resolve) => {
+    reportArtworkRequested = resolve;
+  });
+  let artworkRequests = 0;
+  await page.route("**/held-artwork.png", async (route) => {
+    artworkRequests++;
+    if (artworkRequests === 1) {
+      reportArtworkRequested();
+      await artworkAllowed;
+    }
+    try {
+      await route.fulfill({
+        contentType: "image/png",
+        body: Buffer.from(image.split(",")[1] || "", "base64"),
+      });
+    } catch {
+      // The browser can cancel the first image request when the view unmounts.
+    }
+  });
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      json: {
+        id: "listener",
+        display_name: "Test Listener",
+        images: [{ url: "/held-artwork.png" }],
+      },
+    }),
+  );
+  await page.route("**/api/top/**", (route) =>
+    route.fulfill({
+      json: {
+        items: Array.from({ length: 50 }, (_, index) => ({
+          id: `artist-${index}`,
+          images: [{ url: image }],
+        })),
+        next: null,
+      },
+    }),
+  );
+
+  try {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Artists", exact: true }).click();
+    await artworkRequested;
+    await page.goBack();
+    await expect(
+      page.getByRole("button", { name: "Artists", exact: true }),
+    ).toBeVisible();
+    const drawsAfterLeaving = await page.evaluate(
+      () =>
+        (window as Window & { collectionDraws?: number }).collectionDraws || 0,
+    );
+    releaseArtwork();
+    await page.waitForTimeout(3200);
+    expect(
+      await page.evaluate(
+        () =>
+          (window as Window & { collectionDraws?: number }).collectionDraws ||
+          0,
+      ),
+    ).toBe(drawsAfterLeaving);
+
+    await page.getByRole("button", { name: "Artists", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Download Collection" }),
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.locator("#canvas canvas")).toHaveCount(1);
+  } finally {
+    releaseArtwork();
+  }
+});

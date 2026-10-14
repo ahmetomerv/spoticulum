@@ -97,10 +97,10 @@ export const drawCell = (
   imgUrl: string,
   cellSize = 50,
   imgResultCallback?: ImageResultCallback,
-): void => {
+): (() => void) => {
   if (!imgUrl.trim()) {
     imgResultCallback?.("failed");
-    return;
+    return () => {};
   }
 
   const x = xCell * cellSize;
@@ -108,16 +108,33 @@ export const drawCell = (
   const img = new Image();
   let opacity = 0;
   let settled = false;
+  let fadeTimeout: ReturnType<typeof setTimeout> | null = null;
+  let animationFrame: number | null = null;
   const timeout = setTimeout(() => finish("failed"), 15000);
+
+  function clearScheduledWork(): void {
+    clearTimeout(timeout);
+    if (fadeTimeout !== null) clearTimeout(fadeTimeout);
+    if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+  }
 
   function finish(result: Parameters<ImageResultCallback>[0]): void {
     if (settled) return;
     settled = true;
-    clearTimeout(timeout);
+    clearScheduledWork();
     img.onload = null;
     img.onerror = null;
     context.globalAlpha = 1;
     imgResultCallback?.(result);
+  }
+
+  function dispose(): void {
+    if (settled) return;
+    settled = true;
+    clearScheduledWork();
+    img.onload = null;
+    img.onerror = null;
+    img.removeAttribute("src");
   }
 
   img.setAttribute("crossorigin", "");
@@ -133,7 +150,8 @@ export const drawCell = (
     const left = (imageWidth - imgSize) / 2;
     const top = (imageHeight - imgSize) / 2;
     const fadeIn = (): void => {
-      setTimeout(() => {
+      fadeTimeout = setTimeout(() => {
+        fadeTimeout = null;
         if (settled) return;
         try {
           context.globalAlpha = opacity;
@@ -153,7 +171,11 @@ export const drawCell = (
           return;
         }
         opacity += 0.1;
-        if (opacity < 1) requestAnimationFrame(fadeIn);
+        if (opacity < 1)
+          animationFrame = requestAnimationFrame(() => {
+            animationFrame = null;
+            fadeIn();
+          });
         else finish("loaded");
       }, 40);
     };
@@ -164,4 +186,5 @@ export const drawCell = (
   } catch {
     finish("failed");
   }
+  return dispose;
 };

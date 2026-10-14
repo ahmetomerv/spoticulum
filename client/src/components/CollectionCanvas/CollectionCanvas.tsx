@@ -39,6 +39,10 @@ class CollectionCanvas extends React.Component<
   RouterProps,
   CollectionCanvasState
 > {
+  private readonly abortController = new AbortController();
+  private disposed = false;
+  private disposeDrawing: (() => void) | null = null;
+
   override state: CollectionCanvasState = {
     collectionIsReady: false,
     canvas: null,
@@ -59,19 +63,28 @@ class CollectionCanvas extends React.Component<
         : null;
     const user = this.props.location?.state?.user;
     this.setState({ collectionRequestType, user: user || null }, async () => {
+      if (this.disposed) return;
       if (user) {
         if (user.display_name) updateDocumentTitle(user.display_name);
         this.initializeCollectionData();
         return;
       }
       const authenticatedUser = await this.getAuthenticatedUser();
-      if (!this.state.error && authenticatedUser) {
+      if (!this.disposed && !this.state.error && authenticatedUser) {
         this.initializeCollectionData();
       }
     });
   }
 
+  override componentWillUnmount() {
+    this.disposed = true;
+    this.abortController.abort();
+    this.disposeDrawing?.();
+    this.disposeDrawing = null;
+  }
+
   initializeCollectionData = () => {
+    if (this.disposed) return;
     const { collectionRequestType, timeRange } = this.state;
     const limit = 50;
     const minimumEntities = 60;
@@ -79,6 +92,7 @@ class CollectionCanvas extends React.Component<
     let mediaEntities: MediaEntity[] = [];
 
     const loadNextPage = () => {
+      if (this.disposed) return;
       if (!collectionRequestType) {
         this.setState({
           error: new Error(
@@ -89,6 +103,7 @@ class CollectionCanvas extends React.Component<
       }
       this.getTop(collectionRequestType, offset, limit, timeRange)
         .then((res) => {
+          if (this.disposed) return;
           mediaEntities = [
             ...mediaEntities,
             ...res.items.map(mediaEntityMapper),
@@ -98,9 +113,9 @@ class CollectionCanvas extends React.Component<
             loadNextPage();
             return;
           }
-          this.setState({ mediaEntities }, () =>
-            this.createSpotifyCollection(),
-          );
+          this.setState({ mediaEntities }, () => {
+            if (!this.disposed) this.createSpotifyCollection();
+          });
         })
         .catch((error) => {
           this.handleApiError(error);
@@ -112,8 +127,11 @@ class CollectionCanvas extends React.Component<
 
   getAuthenticatedUser = () => {
     this.setState({ isLoading: true });
-    return spotifyApi<SpotifyProfile>("/api/me")
+    return spotifyApi<SpotifyProfile>("/api/me", {
+      signal: this.abortController.signal,
+    })
       .then((data) => {
+        if (this.disposed) return null;
         this.setState({ user: data });
         if (data && data.display_name) {
           updateDocumentTitle(data.display_name);
@@ -125,11 +143,16 @@ class CollectionCanvas extends React.Component<
         return null;
       })
       .finally(() => {
-        this.setState({ isLoading: false });
+        if (!this.disposed) this.setState({ isLoading: false });
       });
   };
 
   handleApiError = (error: unknown) => {
+    if (
+      this.disposed ||
+      (error instanceof Error && error.name === "AbortError")
+    )
+      return;
     if (error instanceof SpotifyApiError && error.status === 401) {
       this.props.navigate("/?auth_error=session_expired", { replace: true });
       return;
@@ -154,8 +177,9 @@ class CollectionCanvas extends React.Component<
     });
     return spotifyApi<SpotifyTopResponse>(
       `/api/top/${requestedType}?${params}`,
+      { signal: this.abortController.signal },
     ).finally(() => {
-      this.setState({ isLoading: false });
+      if (!this.disposed) this.setState({ isLoading: false });
     });
   };
 
@@ -167,10 +191,19 @@ class CollectionCanvas extends React.Component<
   };
 
   logoutClickHandler = () => {
-    spotifyApi("/api/logout", { method: "POST" })
-      .catch((error) => console.error(error))
+    spotifyApi("/api/logout", {
+      method: "POST",
+      signal: this.abortController.signal,
+    })
+      .catch((error) => {
+        if (
+          !this.disposed &&
+          !(error instanceof Error && error.name === "AbortError")
+        )
+          console.error(error);
+      })
       .finally(() => {
-        window.location.href = "/";
+        if (!this.disposed) window.location.href = "/";
       });
   };
 
@@ -189,6 +222,7 @@ class CollectionCanvas extends React.Component<
   };
 
   createSpotifyCollection = () => {
+    if (this.disposed) return;
     const pickArtwork = createCollectionArtworkPicker(this.state.mediaEntities);
     if (!pickArtwork) {
       this.setState({
@@ -222,13 +256,16 @@ class CollectionCanvas extends React.Component<
     let logoLoaded = false;
     let failed = false;
     let finalized = false;
+    const cellDisposers: Array<() => void> = [];
+    let rowTimeout: ReturnType<typeof setTimeout> | null = null;
     const failCollection = (message: string): void => {
-      if (failed || finalized) return;
+      if (this.disposed || failed || finalized) return;
       failed = true;
       this.setState({ error: new Error(message) });
     };
     const tryFinalize = (): void => {
       if (
+        this.disposed ||
         failed ||
         finalized ||
         !drawingScheduledComplete ||
@@ -264,15 +301,26 @@ class CollectionCanvas extends React.Component<
       size: number,
     ): void => {
       pendingCells++;
-      drawCell(x, y, null, context, padding, imageUrl, size, (result) => {
-        pendingCells--;
-        if (result === "failed") {
-          failCollection(
-            "An image could not be loaded. Return Home and try again.",
-          );
-        }
-        tryFinalize();
-      });
+      const disposeCell = drawCell(
+        x,
+        y,
+        null,
+        context,
+        padding,
+        imageUrl,
+        size,
+        (result) => {
+          if (this.disposed) return;
+          pendingCells--;
+          if (result === "failed") {
+            failCollection(
+              "An image could not be loaded. Return Home and try again.",
+            );
+          }
+          tryFinalize();
+        },
+      );
+      cellDisposers.push(disposeCell);
     };
     context.lineWidth = 5;
     const padding = context.lineWidth / 6;
@@ -333,7 +381,9 @@ class CollectionCanvas extends React.Component<
     let canvasLoop: (remainingRows: number) => void;
 
     (canvasLoop = (z: number) => {
-      setTimeout(() => {
+      rowTimeout = setTimeout(() => {
+        rowTimeout = null;
+        if (this.disposed) return;
         for (let i = 0; i < stepsToTake; i++) {
           if (stepsToTakeRight !== 0) {
             const imgUrl = pickArtwork(cellIndexCounter);
@@ -450,17 +500,28 @@ class CollectionCanvas extends React.Component<
       );
     }, 15000);
     logo.onload = () => {
+      if (this.disposed) return;
       clearTimeout(logoTimeout);
       logoLoaded = true;
       tryFinalize();
     };
     logo.onerror = () => {
+      if (this.disposed) return;
       clearTimeout(logoTimeout);
       failCollection(
         "The collection logo could not be loaded. Return Home and try again.",
       );
     };
     logo.src = "spoticulum-logo.png";
+    this.disposeDrawing = () => {
+      if (rowTimeout !== null) clearTimeout(rowTimeout);
+      clearTimeout(logoTimeout);
+      logo.onload = null;
+      logo.onerror = null;
+      logo.removeAttribute("src");
+      cellDisposers.forEach((disposeCell) => disposeCell());
+      canvas.remove();
+    };
   };
 
   override render() {

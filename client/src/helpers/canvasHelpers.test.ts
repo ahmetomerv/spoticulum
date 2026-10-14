@@ -22,6 +22,7 @@ beforeEach(() => {
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
     setTimeout(() => callback(0), 0),
   );
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
 });
 
 afterEach(() => {
@@ -72,4 +73,30 @@ test("times out a stalled image and ignores a late load", () => {
 
   expect(onResult).toHaveBeenCalledOnce();
   expect(onResult).toHaveBeenCalledWith("failed");
+});
+
+test("disposing an image stops drawing and ignores a later load", () => {
+  const onResult = vi.fn();
+  const dispose = drawCell(0, 0, null, context, 0, "pending.png", 50, onResult);
+
+  dispose();
+  images[0]?.dispatchEvent(new Event("load"));
+  vi.runAllTimers();
+
+  expect(onResult).not.toHaveBeenCalled();
+  expect(context.drawImage).not.toHaveBeenCalled();
+});
+
+test("disposing during a fade stops later frames without reporting completion", () => {
+  const onResult = vi.fn();
+  const dispose = drawCell(0, 0, null, context, 0, "pending.png", 50, onResult);
+
+  images[0]?.dispatchEvent(new Event("load"));
+  vi.advanceTimersByTime(40);
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  dispose();
+  vi.runAllTimers();
+
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  expect(onResult).not.toHaveBeenCalled();
 });
