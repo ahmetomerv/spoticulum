@@ -89,6 +89,7 @@ test("leaving during pagination stops the next page and canvas creation", async 
         Response.json({
           items: Array.from({ length: 50 }, (_, index) => ({
             id: `artist-${index}`,
+            name: `Artist ${index}`,
             images: [{ url: "artwork.png" }],
           })),
           next: "/api/top/artists?offset=50",
@@ -116,4 +117,52 @@ test("leaving during pagination stops the next page and canvas creation", async 
   });
   expect(fetchMock).toHaveBeenCalledTimes(3);
   expect(document.querySelector("canvas")).toBeNull();
+});
+
+test("an empty top list stops pagination and offers a way home", async () => {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) =>
+    Response.json(
+      String(input) === "/api/me"
+        ? { id: "listener", display_name: "Listener", images: [] }
+        : {
+            items: [],
+            next: "https://api.spotify.com/v1/me/top/artists?offset=50",
+          },
+    ),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+
+  renderCollection();
+  expect(
+    await screen.findByRole("heading", { name: "No collection data yet" }),
+  ).toBeVisible();
+  expect(screen.getByText(/no top artists/i)).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "Download Collection" }),
+  ).toBeNull();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  await userEvent.click(screen.getByRole("button", { name: "Home" }));
+  expect(screen.getByText("Home view")).toBeVisible();
+});
+
+test("malformed top-list JSON shows a controlled error", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) =>
+      Response.json(
+        String(input) === "/api/me"
+          ? { id: "listener", display_name: "Listener", images: [] }
+          : { items: {}, next: null },
+      ),
+    ),
+  );
+
+  renderCollection();
+  expect(
+    await screen.findByText(/Invalid Spotify collection data/),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "Home" })).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "Download Collection" }),
+  ).toBeNull();
 });

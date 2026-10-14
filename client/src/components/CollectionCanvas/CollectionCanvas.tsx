@@ -7,7 +7,7 @@ import {
   downloadCanvasImage,
 } from "../../helpers/canvasHelpers";
 import { updateDocumentTitle, getRandomColor } from "../../helpers/utils";
-import mediaEntityMapper from "../../helpers/mediaEntityMapper";
+import { parseTopPage } from "../../helpers/mediaEntityMapper";
 import { withRouter } from "../../withRouter";
 import { trackAnalyticsEvent } from "../../platform/analytics";
 import { spotifyApi } from "../../helpers/spotifyApi";
@@ -18,10 +18,10 @@ import { Button, Header, Segment } from "semantic-ui-react";
 import type { RouterProps } from "../../types/navigation";
 import type {
   CollectionRequestType,
+  CollectionPage,
   MediaEntity,
   SpotifyProfile,
   SpotifyTimeRange,
-  SpotifyTopResponse,
 } from "../../types/spotify";
 
 interface CollectionCanvasState {
@@ -30,6 +30,7 @@ interface CollectionCanvasState {
   timeRange: SpotifyTimeRange;
   isLoading: boolean;
   error: Error | null;
+  emptyReason: "no-results" | "no-artwork" | null;
   mediaEntities: MediaEntity[];
   collectionRequestType: CollectionRequestType | null;
   user: SpotifyProfile | null;
@@ -49,6 +50,7 @@ class CollectionCanvas extends React.Component<
     timeRange: "long_term",
     isLoading: false,
     error: null,
+    emptyReason: null,
     mediaEntities: [],
     collectionRequestType: null,
     user: null,
@@ -104,13 +106,18 @@ class CollectionCanvas extends React.Component<
       this.getTop(collectionRequestType, offset, limit, timeRange)
         .then((res) => {
           if (this.disposed) return;
-          mediaEntities = [
-            ...mediaEntities,
-            ...res.items.map(mediaEntityMapper),
-          ];
-          if (res.next && mediaEntities.length < minimumEntities) {
+          mediaEntities = [...mediaEntities, ...res.items];
+          if (
+            res.items.length > 0 &&
+            res.next &&
+            mediaEntities.length < minimumEntities
+          ) {
             offset += limit;
             loadNextPage();
+            return;
+          }
+          if (mediaEntities.length === 0) {
+            this.setState({ emptyReason: "no-results" });
             return;
           }
           this.setState({ mediaEntities }, () => {
@@ -168,19 +175,20 @@ class CollectionCanvas extends React.Component<
     offset: number,
     limit: number,
     timeRange: SpotifyTimeRange,
-  ): Promise<SpotifyTopResponse> => {
+  ): Promise<CollectionPage> => {
     this.setState({ isLoading: true });
     const params = new URLSearchParams({
       time_range: timeRange,
       offset: String(offset),
       limit: String(limit),
     });
-    return spotifyApi<SpotifyTopResponse>(
-      `/api/top/${requestedType}?${params}`,
-      { signal: this.abortController.signal },
-    ).finally(() => {
-      if (!this.disposed) this.setState({ isLoading: false });
-    });
+    return spotifyApi<unknown>(`/api/top/${requestedType}?${params}`, {
+      signal: this.abortController.signal,
+    })
+      .then((data) => parseTopPage(data, requestedType))
+      .finally(() => {
+        if (!this.disposed) this.setState({ isLoading: false });
+      });
   };
 
   goBackClickHandler = () => {
@@ -225,11 +233,7 @@ class CollectionCanvas extends React.Component<
     if (this.disposed) return;
     const pickArtwork = createCollectionArtworkPicker(this.state.mediaEntities);
     if (!pickArtwork) {
-      this.setState({
-        error: new Error(
-          "No artwork is available for this collection. Return Home and try the other collection.",
-        ),
-      });
+      this.setState({ emptyReason: "no-artwork" });
       return;
     }
 
@@ -525,7 +529,7 @@ class CollectionCanvas extends React.Component<
   };
 
   override render() {
-    const { collectionIsReady, error } = this.state;
+    const { collectionIsReady, emptyReason, error } = this.state;
 
     if (error) {
       return (
@@ -536,6 +540,30 @@ class CollectionCanvas extends React.Component<
             </Header>
             <Segment attached>
               <p>{error.message}</p>
+              <Button onClick={() => this.props.navigate("/")}>Home</Button>
+            </Segment>
+          </div>
+        </div>
+      );
+    }
+
+    if (emptyReason) {
+      const collectionName =
+        this.state.collectionRequestType === "tracks" ? "albums" : "artists";
+      return (
+        <div className="canvas-container">
+          <div className="canvas-content">
+            <Header as="h1" block attached="top">
+              {emptyReason === "no-results"
+                ? "No collection data yet"
+                : "No artwork to show"}
+            </Header>
+            <Segment attached>
+              <p>
+                {emptyReason === "no-results"
+                  ? `Spotify returned no top ${collectionName} for this period. Return Home and try the other collection.`
+                  : `No artwork is available for these ${collectionName}. Return Home and try the other collection.`}
+              </p>
               <Button onClick={() => this.props.navigate("/")}>Home</Button>
             </Segment>
           </div>

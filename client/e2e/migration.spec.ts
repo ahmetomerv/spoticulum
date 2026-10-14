@@ -106,8 +106,13 @@ for (const type of ["artists", "tracks"]) {
       const items = Array.from({ length: 50 }, (_, index) => ({
         id: `${type}-${offset + index}`,
         ...(type === "artists"
-          ? { images: [{ url: image }] }
-          : { album: { images: [{ url: image }] } }),
+          ? { name: `Artist ${offset + index}`, images: [{ url: image }] }
+          : {
+              album: {
+                name: `Album ${offset + index}`,
+                images: [{ url: image }],
+              },
+            }),
       }));
       await route.fulfill({
         json: {
@@ -201,8 +206,13 @@ test("switching from artists back to albums replaces the collection type", async
     const items = Array.from({ length: 50 }, (_, index) => ({
       id: `${type}-${offset + index}`,
       ...(type === "artists"
-        ? { images: [{ url: image }] }
-        : { album: { images: [{ url: image }] } }),
+        ? { name: `Artist ${offset + index}`, images: [{ url: image }] }
+        : {
+            album: {
+              name: `Album ${offset + index}`,
+              images: [{ url: image }],
+            },
+          }),
     }));
     await route.fulfill({
       json: {
@@ -309,7 +319,7 @@ test("a Spotify rate limit is shown instead of treating the response as collecti
   expect(pageErrors).toEqual([]);
 });
 
-test("a collection without usable artwork shows an actionable error", async ({
+test("a collection without usable artwork shows an actionable empty state", async ({
   page,
 }) => {
   await page.route("**/api/me", (route) =>
@@ -322,6 +332,7 @@ test("a collection without usable artwork shows an actionable error", async ({
       json: {
         items: Array.from({ length: 50 }, (_, index) => ({
           id: `artist-${index}`,
+          name: `Artist ${index}`,
           images: [],
         })),
         next: null,
@@ -335,6 +346,28 @@ test("a collection without usable artwork shows an actionable error", async ({
     page.getByRole("button", { name: "Download Collection" }),
   ).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Home" })).toBeVisible();
+});
+
+test("an empty top list offers a way back without creating a canvas", async ({
+  page,
+}) => {
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      json: { id: "listener", display_name: "Test Listener", images: [] },
+    }),
+  );
+  await page.route("**/api/top/**", (route) =>
+    route.fulfill({ json: { items: [], next: null } }),
+  );
+
+  await page.goto("/collection?collection_request_type=artists");
+  await expect(
+    page.getByRole("heading", { name: "No collection data yet" }),
+  ).toBeVisible();
+  await expect(page.getByText(/no top artists/i)).toBeVisible();
+  await expect(page.locator("#canvas canvas")).toHaveCount(0);
+  await page.getByRole("button", { name: "Home" }).click();
+  await expect(page).toHaveURL("/");
 });
 
 test("missing artwork reuses available art and waits for the logo before download", async ({
@@ -369,6 +402,7 @@ test("missing artwork reuses available art and waits for the logo before downloa
       json: {
         items: Array.from({ length: 50 }, (_, index) => ({
           id: `artist-${index}`,
+          name: `Artist ${index}`,
           images: index === 0 ? [{ url: image }] : [],
         })),
         next: null,
@@ -409,6 +443,7 @@ test("a failed artwork request cannot enable download", async ({ page }) => {
       json: {
         items: Array.from({ length: 50 }, (_, index) => ({
           id: `artist-${index}`,
+          name: `Artist ${index}`,
           images: [{ url: "http://127.0.0.1:3101/broken-artwork.png" }],
         })),
         next: null,
@@ -481,6 +516,7 @@ test("leaving during image loading stops old drawing and returning creates one c
       json: {
         items: Array.from({ length: 50 }, (_, index) => ({
           id: `artist-${index}`,
+          name: `Artist ${index}`,
           images: [{ url: image }],
         })),
         next: null,

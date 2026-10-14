@@ -15,35 +15,15 @@ export interface SpotifyProfile {
   external_urls?: SpotifyExternalUrls;
 }
 
-export interface SpotifyArtist {
-  id: string;
-  images: SpotifyImage[];
-  name?: string;
-}
-
-export interface SpotifyAlbum {
-  images: SpotifyImage[];
-  name?: string;
-}
-
-export interface SpotifyTrack {
-  id: string;
-  album: SpotifyAlbum;
-  name?: string;
-}
-
-export type SpotifyTopItem = SpotifyArtist | SpotifyTrack;
-
-export interface SpotifyTopResponse<T extends SpotifyTopItem = SpotifyTopItem> {
-  items: T[];
-  next: string | null;
-  offset?: number;
-}
-
 export interface MediaEntity {
   id: string;
+  label: string;
   images: SpotifyImage[];
-  name?: string;
+}
+
+export interface CollectionPage {
+  items: MediaEntity[];
+  next: string | null;
 }
 
 export type CollectionRequestType = "artists" | "tracks";

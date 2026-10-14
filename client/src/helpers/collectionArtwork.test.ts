@@ -4,8 +4,8 @@ import { createCollectionArtworkPicker } from "./collectionArtwork";
 test("returns no picker when every entity has missing artwork", () => {
   expect(
     createCollectionArtworkPicker([
-      { id: "one", images: [] },
-      { id: "two", images: [{ url: "" }] },
+      { id: "one", label: "One", images: [] },
+      { id: "two", label: "Two", images: [{ url: "" }] },
     ]),
   ).toBeNull();
 });
@@ -13,9 +13,9 @@ test("returns no picker when every entity has missing artwork", () => {
 test("keeps artwork order and reuses only usable images for missing cells", () => {
   const pick = createCollectionArtworkPicker(
     [
-      { id: "one", images: [{ url: "first.png" }] },
-      { id: "two", images: [] },
-      { id: "three", images: [{ url: "third.png" }] },
+      { id: "one", label: "One", images: [{ url: "first.png" }] },
+      { id: "two", label: "Two", images: [] },
+      { id: "three", label: "Three", images: [{ url: "third.png" }] },
     ],
     () => 0,
   );
