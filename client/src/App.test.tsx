@@ -131,7 +131,7 @@ test("preserves the login screen and legal navigation", async () => {
     screen.getByRole("link", { name: "Terms of Service & Privacy Policy" }),
   );
   expect(
-    screen.getByText(/not affiliated with, authorized by, endorsed by/),
+    await screen.findByText(/not affiliated with, authorized by, endorsed by/),
   ).toBeVisible();
   expect(screen.getByRole("link", { name: "Spoticulum" })).toHaveAttribute(
     "href",
