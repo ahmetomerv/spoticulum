@@ -30,3 +30,5 @@ yarn-error.log*
 client/src/testData
 
 /tasks
+
+/node_modules/
