@@ -15,4 +15,4 @@ npm start
 
 `build:server` emits `dist`; `start` runs `dist/app.js`. In production, configure
 `CLIENT_ID`, `CLIENT_SECRET`, `SESSION_SECRET`, `REDIRECTURI`, and
-`CLIENT_REDIRECTURI`. See the repository README for Coolify settings.
+`CLIENT_REDIRECTURI`. See the repository README's Production section.

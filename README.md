@@ -110,8 +110,8 @@ Useful package-specific commands:
 npm --prefix client run test:e2e
 npm --prefix client run format:check
 npm --prefix server run format:check
-npm --prefix client audit
-npm --prefix server audit --omit=dev
+npm --prefix client audit --audit-level=high
+npm --prefix server audit --audit-level=high
 ```
 
 Install Playwright's Chromium browser before the first E2E run:
@@ -122,7 +122,9 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The E2E tests use mocked Spotify responses, so they do not require a real Spotify
+A local E2E run compiles the server before the tests start. In CI, the workflow
+builds the server first and Playwright only starts `server/dist/app.js`. The
+tests use mocked Spotify responses, so they do not require a real Spotify
 account.
 
 ## Production
