@@ -9,3 +9,4 @@ server/dist
 **/test-results
 **/playwright-report
 **/.DS_Store
+/tasks
