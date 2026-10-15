@@ -17,3 +17,7 @@ npm start
 
 `build:server` emits `dist`; `start` runs `dist/app.js`. See the repository
 README's Production section.
+
+Runtime logs are JSON lines on stdout. Set `LOG_LEVEL` to `debug`, `info`
+(default), `warn`, `error`, or `silent` to control verbosity. API responses
+include an `X-Request-Id` header that matches the request and domain events.

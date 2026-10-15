@@ -14,6 +14,7 @@ import type {
 import { createApp } from "../src/createApp.js";
 
 const env = {
+  LOG_LEVEL: "silent",
   CLIENT_ID: "test-client",
   CLIENT_SECRET: "test-secret",
   SESSION_SECRET: "test-session-secret-with-at-least-32-characters",

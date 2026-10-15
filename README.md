@@ -64,6 +64,7 @@ Server runtime variables:
 | `CLIENT_REDIRECTURI` | Yes | App URL to return users to after OAuth. |
 | `PORT` | No | API port. Defaults to `8888`. |
 | `COOKIE_SECURE` | No | Set to `true` to force secure cookies outside production. |
+| `LOG_LEVEL` | No | Minimum server log level: `debug`, `info` (default), `warn`, `error`, or `silent`. |
 
 Client build variable:
 
@@ -138,6 +139,13 @@ image:
 docker build -t spoticulum .
 docker run --env-file server/.env -p 8888:8888 spoticulum
 ```
+
+The server writes one JSON event per line to stdout. Use the terminal running
+`npm run dev` for local logs, or `docker logs <container>` for a container.
+API completion events include a request ID, route, status, and duration; the
+same ID is returned in the `X-Request-Id` response header. Successful health
+checks and static assets are omitted. Logs do not include request URLs, OAuth
+codes or state, cookies, Spotify tokens, or Spotify response bodies.
 
 Build-time analytics can be supplied with:
 

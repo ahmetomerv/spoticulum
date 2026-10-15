@@ -4,6 +4,12 @@ import express, {
   type Response as ExpressResponse,
   type Router,
 } from "express";
+import {
+  createLogger,
+  type LogFields,
+  type LogLevel,
+  type Logger,
+} from "../logger.js";
 
 const SESSION_COOKIE = "spoticulum_session";
 const STATE_COOKIE = "spoticulum_oauth_state";
@@ -47,6 +53,7 @@ export interface AuthRouteDependencies {
   env?: Environment;
   fetchImpl?: FetchImplementation;
   sessions?: SessionStore;
+  logger?: Logger;
 }
 
 interface CookieOptions {
@@ -247,6 +254,7 @@ export function createAuthRoutes({
   env = process.env,
   fetchImpl = globalThis.fetch as FetchImplementation,
   sessions = new Map<string, SpotifySession>(),
+  logger = createLogger(env),
 }: AuthRouteDependencies = {}): Router {
   validateProductionEnvironment(env);
   const router = express.Router();
@@ -256,6 +264,17 @@ export function createAuthRoutes({
     crypto.randomBytes(32).toString("base64url");
   const secureCookies =
     env.COOKIE_SECURE === "true" || env.NODE_ENV === "production";
+
+  const logRequest = (
+    res: ExpressResponse,
+    level: LogLevel,
+    event: string,
+    fields: LogFields = {},
+  ): void =>
+    logger.log(level, event, {
+      requestId: res.locals.requestId as string | undefined,
+      ...fields,
+    });
 
   const spotifyRequest = async <T = unknown>(
     url: string,
@@ -307,10 +326,10 @@ export function createAuthRoutes({
       sessionExpiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
       spotifyRequestCount: 0,
       spotifyRequestWindowStartedAt: Date.now(),
-      expiryTimer: setTimeout(
-        () => sessions.delete(sessionId),
-        SESSION_MAX_AGE_SECONDS * 1000,
-      ),
+      expiryTimer: setTimeout(() => {
+        sessions.delete(sessionId);
+        logger.log("info", "session_expired");
+      }, SESSION_MAX_AGE_SECONDS * 1000),
     };
     session.expiryTimer.unref?.();
     sessions.set(sessionId, session);
@@ -356,6 +375,7 @@ export function createAuthRoutes({
     if (!session) return null;
     if (session.sessionExpiresAt <= Date.now()) {
       deleteSession(sessionId);
+      logger.log("info", "session_expired");
       return null;
     }
     return { sessionId, session };
@@ -393,6 +413,9 @@ export function createAuthRoutes({
             1000,
         ),
       );
+      logRequest(res, "warn", "local_rate_limited", {
+        retryAfterSeconds: retryAfter,
+      });
       res.set("Cache-Control", "no-store");
       res.set("Retry-After", String(retryAfter));
       res.status(429).json({
@@ -408,6 +431,7 @@ export function createAuthRoutes({
   const refreshAccessToken = async (
     session: SpotifySession,
     staleAccessToken: string,
+    requestId?: string,
   ): Promise<string> => {
     if (session.accessToken !== staleAccessToken) return session.accessToken;
     if (session.refreshPromise) return session.refreshPromise;
@@ -416,6 +440,7 @@ export function createAuthRoutes({
     }
     const refreshToken = session.refreshToken;
     session.refreshPromise = (async () => {
+      logger.log("info", "token_refresh_started", { requestId });
       let data: SpotifyTokenResponse;
       try {
         const response = await spotifyRequest(
@@ -436,6 +461,11 @@ export function createAuthRoutes({
         );
         data = parseTokenResponse(response);
       } catch (error) {
+        logger.log("warn", "token_refresh_failed", {
+          requestId,
+          upstreamStatus:
+            error instanceof SpotifyRequestError ? error.status : undefined,
+        });
         if (
           error instanceof SpotifyRequestError &&
           error.status === 400 &&
@@ -450,6 +480,7 @@ export function createAuthRoutes({
       session.tokenType = data.token_type || session.tokenType;
       session.scope = data.scope || session.scope;
       session.expiresAt = tokenExpiresAt(data);
+      logger.log("info", "token_refresh_succeeded", { requestId });
       return session.accessToken;
     })();
     try {
@@ -461,17 +492,19 @@ export function createAuthRoutes({
 
   const ensureAccessToken = async (
     session: SpotifySession,
+    requestId?: string,
   ): Promise<string> => {
     if (session.expiresAt - Date.now() > MIN_TOKEN_TTL_MS) {
       return session.accessToken;
     }
-    return refreshAccessToken(session, session.accessToken);
+    return refreshAccessToken(session, session.accessToken, requestId);
   };
 
   const spotifyUserRequest = async <T = unknown>(
     session: SpotifySession,
     url: string,
     options: RequestInit = {},
+    requestId?: string,
   ): Promise<T> => {
     const requestWithToken = (accessToken: string): Promise<T> =>
       spotifyRequest<T>(url, {
@@ -481,7 +514,7 @@ export function createAuthRoutes({
           Authorization: `Bearer ${accessToken}`,
         },
       });
-    const accessToken = await ensureAccessToken(session);
+    const accessToken = await ensureAccessToken(session, requestId);
     try {
       return await requestWithToken(accessToken);
     } catch (error) {
@@ -491,6 +524,7 @@ export function createAuthRoutes({
       const refreshedAccessToken = await refreshAccessToken(
         session,
         accessToken,
+        requestId,
       );
       return requestWithToken(refreshedAccessToken);
     }
@@ -506,8 +540,25 @@ export function createAuthRoutes({
         ? error
         : new SpotifyRequestError("Spotify request failed", 502);
     const status = spotifyError.status || 502;
+    const responseStatus = status >= 400 && status < 500 ? status : 502;
+    logRequest(
+      res,
+      status >= 500 ? "error" : "warn",
+      "spotify_request_failed",
+      {
+        upstreamStatus:
+          error instanceof SpotifyRequestError ? error.status : undefined,
+        statusCode: responseStatus,
+        reason:
+          status === 429 &&
+          spotifyErrorReason(spotifyError.spotifyError) === "QUOTA_EXCEEDED"
+            ? "quota_exceeded"
+            : undefined,
+      },
+    );
     if (status === 401) {
       if (stored) deleteSession(stored.sessionId);
+      logRequest(res, "warn", "session_invalidated");
       clearAuthCookies(res);
       return res.status(401).json({ error: "Spotify authorization expired" });
     }
@@ -541,6 +592,7 @@ export function createAuthRoutes({
   router.get("/login", (_req, res) => {
     const state = crypto.randomBytes(24).toString("base64url");
     setSignedCookie(res, STATE_COOKIE, state, STATE_MAX_AGE_SECONDS);
+    logRequest(res, "info", "oauth_started");
     const query = new URLSearchParams({
       response_type: "code",
       client_id: env.CLIENT_ID || "",
@@ -558,34 +610,53 @@ export function createAuthRoutes({
       clearCookieHeader(STATE_COOKIE, { secure: secureCookies }),
     );
     if (!state || !timingSafeStringEqual(req.query.state, state)) {
+      logRequest(res, "warn", "oauth_callback_rejected", {
+        reason: "invalid_state",
+      });
       return res.status(400).json({ error: "Invalid Spotify callback" });
     }
     if (typeof req.query.error === "string") {
+      logRequest(res, "info", "oauth_denied");
       return res.redirect(clientRedirect({ auth_error: req.query.error }));
     }
     if (typeof req.query.code !== "string" || !req.query.code) {
+      logRequest(res, "warn", "oauth_callback_rejected", {
+        reason: "missing_code",
+      });
       return res.status(400).json({ error: "Invalid Spotify callback" });
     }
-    const response = await spotifyRequest(
-      "https://accounts.spotify.com/api/token",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
+    let sessionId: string;
+    try {
+      const response = await spotifyRequest(
+        "https://accounts.spotify.com/api/token",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+          },
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: req.query.code,
+            redirect_uri: env.REDIRECTURI || "",
+            client_id: env.CLIENT_ID || "",
+            client_secret: env.CLIENT_SECRET || "",
+          }),
         },
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          code: req.query.code,
-          redirect_uri: env.REDIRECTURI || "",
-          client_id: env.CLIENT_ID || "",
-          client_secret: env.CLIENT_SECRET || "",
-        }),
-      },
-    );
-    const sessionId = createSession(parseTokenResponse(response));
+      );
+      sessionId = createSession(parseTokenResponse(response));
+    } catch (error) {
+      logRequest(res, "error", "oauth_token_exchange_failed", {
+        upstreamStatus:
+          error instanceof SpotifyRequestError ? error.status : undefined,
+      });
+      res.locals.errorLogged = true;
+      throw error;
+    }
+    logRequest(res, "info", "session_created");
     setSignedCookie(res, SESSION_COOKIE, sessionId, SESSION_MAX_AGE_SECONDS);
     res.set("Cache-Control", "no-store");
+    logRequest(res, "info", "oauth_succeeded");
     res.redirect(clientRedirect({ auth: "success" }));
   });
 
@@ -597,6 +668,8 @@ export function createAuthRoutes({
       const data = await spotifyUserRequest(
         stored.session,
         "https://api.spotify.com/v1/me",
+        {},
+        res.locals.requestId as string | undefined,
       );
       res.set("Cache-Control", "no-store");
       res.json(data);
@@ -627,6 +700,8 @@ export function createAuthRoutes({
       const data = await spotifyUserRequest(
         stored.session,
         `https://api.spotify.com/v1/me/top/${req.params.type}?${params}`,
+        {},
+        res.locals.requestId as string | undefined,
       );
       res.set("Cache-Control", "no-store");
       res.json(data);
@@ -637,7 +712,9 @@ export function createAuthRoutes({
 
   router.post("/logout", (req, res) => {
     const sessionId = readSignedCookie(req, SESSION_COOKIE);
+    const hadSession = Boolean(sessionId && sessions.has(sessionId));
     if (sessionId) deleteSession(sessionId);
+    logRequest(res, "info", "session_logged_out", { hadSession });
     clearAuthCookies(res);
     res.set("Cache-Control", "no-store");
     res.status(204).end();

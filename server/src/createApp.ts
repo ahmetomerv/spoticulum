@@ -2,6 +2,8 @@ import express, { type ErrorRequestHandler, type Express } from "express";
 import cors, { type CorsOptions } from "cors";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, resolve } from "node:path";
+import crypto from "node:crypto";
+import { createLogger, type Logger } from "./logger.js";
 import {
   createAuthRoutes,
   type Environment,
@@ -14,6 +16,7 @@ interface CreateAppOptions {
   fetchImpl?: FetchImplementation;
   sessions?: SessionStore;
   clientBuild?: string;
+  logger?: Logger;
 }
 
 interface HttpError extends Error {
@@ -69,13 +72,34 @@ export function createApp({
   fetchImpl = globalThis.fetch,
   sessions,
   clientBuild = defaultClientBuild(),
+  logger = createLogger(env),
 }: CreateAppOptions = {}): Express {
   const app = express();
   app.disable("x-powered-by");
+  app.use("/api", (req, res, next) => {
+    const requestId = crypto.randomUUID();
+    const started = performance.now();
+    res.locals.requestId = requestId;
+    res.setHeader("X-Request-Id", requestId);
+    res.once("finish", () => {
+      const route =
+        typeof req.route?.path === "string"
+          ? `/api${req.route.path}`
+          : "/api/*";
+      logger.log("info", "http_request_completed", {
+        requestId,
+        method: req.method,
+        route,
+        statusCode: res.statusCode,
+        durationMs: Math.round(performance.now() - started),
+      });
+    });
+    next();
+  });
   app.use(
     "/api",
     cors(createApiCorsOptions(env)),
-    createAuthRoutes({ env, fetchImpl, sessions }),
+    createAuthRoutes({ env, fetchImpl, sessions, logger }),
   );
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
   // Unknown API paths must not receive the SPA HTML fallback.
@@ -88,12 +112,22 @@ export function createApp({
   }
   const errorHandler: ErrorRequestHandler = (
     error: unknown,
-    _req,
+    req,
     res,
     _next,
   ) => {
     const httpError = error instanceof Error ? (error as HttpError) : null;
     const status = httpError?.status || 502;
+    if (!res.locals.errorLogged) {
+      logger.log("error", "unhandled_request_error", {
+        requestId: res.locals.requestId as string | undefined,
+        route:
+          typeof req.route?.path === "string"
+            ? `/api${req.route.path}`
+            : "/api/*",
+        statusCode: status,
+      });
+    }
     res.status(status).json({
       error: status === 400 ? httpError?.message : "Spotify request failed",
     });
