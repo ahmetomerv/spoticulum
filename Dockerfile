@@ -1,4 +1,4 @@
-FROM node:24.21.0-bookworm-slim AS client-build
+FROM node:24.22.1-bookworm-slim AS client-build
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
@@ -6,14 +6,14 @@ COPY client/ ./
 ARG VITE_GA
 RUN npm run build
 
-FROM node:24.21.0-bookworm-slim AS server-build
+FROM node:24.22.1-bookworm-slim AS server-build
 WORKDIR /app/server
 COPY server/package*.json ./
 RUN npm ci
 COPY server/ ./
 RUN npm run build:server
 
-FROM node:24.21.0-bookworm-slim AS production
+FROM node:24.22.1-bookworm-slim AS production
 ENV NODE_ENV=production
 ENV PORT=8888
 WORKDIR /app/server

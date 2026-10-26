@@ -5,7 +5,7 @@
   "main": "dist/app.js",
   "type": "module",
   "engines": {
-    "node": ">=24.21.0 <25"
+    "node": ">=24.22.0 <25"
   },
   "scripts": {
     "start": "node dist/app.js",

@@ -8,7 +8,7 @@ The app is built with React 19, Vite, TypeScript, and Express 5. Spotify OAuth t
 
 ## Requirements
 
-- Node `24.21.0` from `.nvmrc`
+- Node `24.22.1` from `.nvmrc`
 - npm `11.x`
 - A Spotify Developer application
 
