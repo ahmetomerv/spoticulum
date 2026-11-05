@@ -1,23 +1,17 @@
 import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem("spoticulum.analytics-consent", "denied");
+  await page.route(/analytics\.ahmeto\.com|fonts\.googleapis\.com/, (route) => {
+    const url = route.request().url();
+    if (url.includes("fonts.googleapis.com")) {
+      return route.fulfill({
+        status: 200,
+        contentType: "text/css",
+        body: "",
+      });
+    }
+    return route.fulfill({ status: 204, body: "" });
   });
-  await page.route(
-    /google-analytics\.com|googletagmanager\.com|fonts\.googleapis\.com/,
-    (route) => {
-      const url = route.request().url();
-      if (url.includes("fonts.googleapis.com")) {
-        return route.fulfill({
-          status: 200,
-          contentType: "text/css",
-          body: "",
-        });
-      }
-      return route.fulfill({ status: 204, body: "" });
-    },
-  );
 });
 
 test("home, popup, example modal, Escape, and legal deep link", async ({

@@ -188,7 +188,7 @@ class Legal extends React.Component<Record<string, never>> {
           <h1 tabIndex={-1}>Privacy Policy</h1>
           <p>
             Last updated and effective:{" "}
-            <time dateTime="2026-09-13">13 September 2026</time>
+            <time dateTime="2026-11-05">5 November 2026</time>
           </p>
 
           <h2>Controller and scope</h2>
@@ -197,7 +197,7 @@ class Legal extends React.Component<Record<string, never>> {
             Spoticulum. Contact:{" "}
             <a href="mailto:spoticulum@ahmeto.com">spoticulum@ahmeto.com</a>.
             This policy explains processing when you visit the website, connect
-            Spotify, generate a collection, or choose optional analytics.
+            Spotify, or generate a collection.
           </p>
 
           <h2>Data processed to provide Spoticulum</h2>
@@ -253,27 +253,12 @@ class Legal extends React.Component<Record<string, never>> {
             .
           </p>
 
-          <h2>Optional Google Analytics</h2>
+          <h2>Website analytics</h2>
           <p>
-            If Google Analytics is configured, it remains disabled until you
-            select “Allow analytics.” With consent, Google Analytics may receive
-            page URLs, interaction events such as a collection download,
-            approximate location derived from IP address, and browser or device
-            information. We do not send your Spotify profile or listening data
-            to Google Analytics. Advertising features and ad-personalization
-            signals are disabled.
-          </p>
-          <p>
-            Google Analytics may set first-party cookies such as{" "}
-            <code>_ga</code> and <code>_ga_&lt;container-id&gt;</code>, which
-            Google documents with a default lifetime of up to two years.
-            User-level and event-level Analytics data is retained for no longer
-            than 14 months; aggregated reports may remain longer. The legal
-            basis is your consent under Article 6(1)(a) GDPR and, where
-            applicable, Section 25(1) TDDDG. Declining analytics does not affect
-            the service. You can withdraw consent at any time through “Privacy
-            settings” in the footer; withdrawal applies to future processing and
-            removes accessible Analytics cookies from this site.
+            Spoticulum uses Umami at analytics.ahmeto.com to understand website
+            usage. The tracking script loads when you visit the site. We do not
+            send your Spotify profile, listening data, or generated collections
+            to Umami.
           </p>
 
           <h2>Recipients and external services</h2>
@@ -283,14 +268,6 @@ class Legal extends React.Component<Record<string, never>> {
               listening data, and image delivery. Review the{" "}
               <ExternalLink href="https://www.spotify.com/legal/privacy-policy/">
                 Spotify Privacy Policy
-              </ExternalLink>
-              .
-            </li>
-            <li>
-              <strong>Google:</strong> Google Ireland Limited and affiliated
-              processors receive analytics data only after consent. Review the{" "}
-              <ExternalLink href="https://policies.google.com/privacy">
-                Google Privacy Policy
               </ExternalLink>
               .
             </li>
@@ -308,10 +285,10 @@ class Legal extends React.Component<Record<string, never>> {
 
           <h2>International transfers</h2>
           <p>
-            Spotify, Google, and infrastructure providers may process data
-            outside the European Economic Area. Depending on the provider and
-            destination, transfers rely on an adequacy decision, the EU–US Data
-            Privacy Framework, Standard Contractual Clauses, or another lawful
+            Spotify and infrastructure providers may process data outside the
+            European Economic Area. Depending on the provider and destination,
+            transfers rely on an adequacy decision, the EU–US Data Privacy
+            Framework, Standard Contractual Clauses, or another lawful
             safeguard. You may contact us for information about safeguards
             relevant to your data.
           </p>
@@ -324,8 +301,7 @@ class Legal extends React.Component<Record<string, never>> {
             is processed for the active request and browser session. Technical
             logs are retained only for the period needed for security,
             troubleshooting, and hosting operations, then deleted or anonymized.
-            Analytics retention is described above. Legal records may be
-            retained where required by law.
+            Legal records may be retained where required by law.
           </p>
 
           <h2>Your rights</h2>

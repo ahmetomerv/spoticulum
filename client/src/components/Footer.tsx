@@ -12,13 +12,7 @@ import { withRouter } from "../withRouter";
 import { Link } from "react-router-dom";
 import type { RouterProps } from "../types/navigation";
 
-interface FooterOwnProps {
-  analyticsAvailable: boolean;
-  onOpenPrivacySettings: () => void;
-  privacySettingsRef: React.Ref<HTMLButtonElement>;
-}
-
-type FooterProps = FooterOwnProps & RouterProps;
+type FooterProps = RouterProps;
 
 interface FooterState {
   footerPopoverContent: string;
@@ -116,16 +110,6 @@ class Footer extends React.Component<FooterProps, FooterState> {
                     <Link className="legal-link" to="/legal">
                       Terms of Service & Privacy Policy
                     </Link>
-                    {this.props.analyticsAvailable && (
-                      <button
-                        className="privacy-settings-link"
-                        type="button"
-                        ref={this.props.privacySettingsRef}
-                        onClick={this.props.onOpenPrivacySettings}
-                      >
-                        Privacy settings
-                      </button>
-                    )}
                   </div>
                   <p className="spotify-disclaimer">
                     Spoticulum is independent and is not affiliated with Spotify

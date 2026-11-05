@@ -154,70 +154,9 @@ body {
 	font-size: .6em;
 }
 
-.privacy-settings-link {
-	margin: 0 .3em;
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: #fff;
-	font: inherit;
-	font-size: .6em;
-	cursor: pointer;
-}
-
-.privacy-settings-link:hover {
-	color: #58dea0;
-	text-decoration: underline;
-}
-
-.analytics-consent {
-	position: fixed;
-	right: 1.5em;
-	bottom: 1.5em;
-	left: 1.5em;
-	z-index: 3000;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 2em;
-	max-width: 900px;
-	margin: 0 auto;
-	padding: 1.25em 1.5em;
-	border: 1px solid #ccc;
-	border-radius: 6px;
-	background: #fff;
-	box-shadow: 0 8px 30px rgb(0 0 0 / 25%);
-}
-
-.analytics-consent p {
-	margin: .35em 0 0;
-}
-
-.analytics-consent h2 {
-	margin: 0;
-	font-size: 1em;
-	font-weight: 700;
-}
-
-.analytics-consent h2:focus-visible,
-.analytics-consent a:focus-visible,
-.analytics-consent button:focus-visible,
 .legal-container h1:focus-visible {
 	outline: 3px solid #236b46;
 	outline-offset: 3px;
-}
-
-.analytics-consent-actions {
-	display: flex;
-	gap: .75em;
-	white-space: nowrap;
-}
-
-.analytics-consent-actions button {
-	padding: .65em 1em;
-	border: 1px solid #bbb;
-	border-radius: 3px;
-	cursor: pointer;
 }
 
 .login-legal-notice {
@@ -263,16 +202,6 @@ body {
 
 	.legal-container {
 		padding: 3em 2em;
-	}
-
-	.analytics-consent {
-		align-items: stretch;
-		flex-direction: column;
-		gap: 1em;
-	}
-
-	.analytics-consent-actions {
-		justify-content: flex-end;
 	}
 }
 

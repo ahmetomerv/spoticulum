@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem("spoticulum.analytics-consent", "denied");
-  });
+  await page.route("https://analytics.ahmeto.com/**", (route) =>
+    route.fulfill({ status: 204, body: "" }),
+  );
 });
 
 test("home does not download collection or legal route modules", async ({

@@ -9,7 +9,6 @@ import {
 import { updateDocumentTitle, getRandomColor } from "../../helpers/utils";
 import { parseTopPage } from "../../helpers/mediaEntityMapper";
 import { withRouter } from "../../withRouter";
-import { trackAnalyticsEvent } from "../../platform/analytics";
 import { spotifyApi } from "../../helpers/spotifyApi";
 import { SpotifyApiError } from "../../helpers/spotifyApi";
 import { getBestSpotifyImageUrl } from "../../helpers/spotifyImages";
@@ -221,11 +220,6 @@ class CollectionCanvas extends React.Component<
         this.state.canvas,
         this.state.user?.display_name || "",
       );
-      trackAnalyticsEvent({
-        category: "main",
-        action: "download",
-        label: "User has downloaded a profile collection",
-      });
     }
   };
 

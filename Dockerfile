@@ -3,7 +3,6 @@ WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
 COPY client/ ./
-ARG VITE_GA
 RUN npm run build
 
 FROM node:24.22.1-bookworm-slim AS server-build

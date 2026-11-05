@@ -15,5 +15,5 @@ npm run build
 npm run test:e2e
 ```
 
-The production bundle is emitted to `build`. `VITE_GA` is the only public build
-variable and is optional.
+The production bundle is emitted to `build`. Umami tracking is configured in
+`index.html`; no analytics environment variables are required.

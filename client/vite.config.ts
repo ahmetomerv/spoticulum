@@ -1,10 +1,8 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig(({ mode }) => {
-  // Expose only the existing public analytics setting, never all process.env.
-  const env = loadEnv(mode, process.cwd(), ["REACT_APP_GA", "VITE_GA"]);
+export default defineConfig(() => {
   return {
     plugins: [react()],
     resolve: {
@@ -13,11 +11,6 @@ export default defineConfig(({ mode }) => {
           new URL("./src/platform/semantic-ui.tsx", import.meta.url),
         ),
       },
-    },
-    define: {
-      "process.env.REACT_APP_GA": JSON.stringify(
-        env.VITE_GA || env.REACT_APP_GA || "",
-      ),
     },
     build: {
       outDir: "build",

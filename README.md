@@ -66,12 +66,6 @@ Server runtime variables:
 | `COOKIE_SECURE` | No | Set to `true` to force secure cookies outside production. |
 | `LOG_LEVEL` | No | Minimum server log level: `debug`, `info` (default), `warn`, `error`, or `silent`. |
 
-Client build variable:
-
-| Name | Required | Description |
-| --- | --- | --- |
-| `VITE_GA` | No | Optional Google Analytics measurement ID. Analytics remains disabled until the user consents. |
-
 Never put `CLIENT_SECRET`, `SESSION_SECRET`, Spotify access tokens, or Spotify
 refresh tokens in client environment variables.
 
@@ -147,11 +141,8 @@ same ID is returned in the `X-Request-Id` response header. Successful health
 checks and static assets are omitted. Logs do not include request URLs, OAuth
 codes or state, cookies, Spotify tokens, or Spotify response bodies.
 
-Build-time analytics can be supplied with:
-
-```sh
-docker build --build-arg VITE_GA=G-XXXXXXXXXX -t spoticulum .
-```
+Site usage is tracked with the Umami script configured in `client/index.html`.
+No analytics build-time environment variables are required.
 
 ## Security and Privacy Notes
 
